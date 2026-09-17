@@ -120,6 +120,20 @@ export async function initDatabase() {
     )
   `);
 
+  await execute(`
+    CREATE TABLE IF NOT EXISTS outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      medicine_id INTEGER,
+      medicine_name TEXT NOT NULL,
+      current_stock INTEGER NOT NULL,
+      reorder_level INTEGER NOT NULL,
+      payload TEXT,
+      status TEXT DEFAULT 'PENDING',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
     // Seed Medicines
     const insertMed = async (name, generic_name, category, unit, reorder_level) => {
       const res = await execute(

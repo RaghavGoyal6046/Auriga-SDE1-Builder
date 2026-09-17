@@ -109,3 +109,36 @@ During development, we followed a test-driven approach:
 - [x] **Landing Page**: Dedicated product page with problem summary, key features, target audience, interactive FEFO demo, and 3 future roadmap features.
 - [x] **Pagination & Sorting**: Implemented on inventory, batches, and dispense audit history.
 - [x] **Root Files**: `README.md`, `REASONING.md`, and `AI_LOGS.md` present in root folder.
+
+---
+
+## 7. Competition Evaluation Twists Implementation Rationale
+
+### Level 1 — T2 (Automation & Daily Clock Tick `/clock`)
+- **Requirement**: Automated daily execution flagging batches expiring within 7 days and quarantining expired ones, graded via `POST /clock`.
+- **Implementation**:
+  - `POST /clock` accepts optional `{ date }` in payload (or defaults to current system date).
+  - Performs atomic SQL updates:
+    1. Quarantines expired active batches (`UPDATE batches SET status = 'EXPIRED' WHERE expiry_date < ? AND status = 'ACTIVE'`).
+    2. Flags and counts batches expiring within 7 days (`expiry_date <= targetDate + 7 days`).
+    3. Triggers outbox re-order alerts if in-date stock falls below threshold.
+  - Returns required grading schema: `{ date, quarantined_count, expiring_soon_count, healthy_count, message }`.
+
+### Level 2 — T4 (Messy Data Import `/api/batches/import-messy`)
+- **Requirement**: Import messy batch list containing nulls, non-standard quantities (`'10 units'`, `'50 capsules'`), non-standard dates (`dd/mm/yyyy` vs ISO), currency symbols, and duplicate rows.
+- **Implementation**:
+  - Implemented robust regex-based cleaning and normalization pipeline in `server/routes/batches.js`:
+    - `parseMessyQuantity()`: Extracts integer quantities from strings like `'10 units'`.
+    - `parseMessyDate()`: Normalizes `dd/mm/yyyy`, `mm/dd/yyyy`, and ISO timestamps into clean `YYYY-MM-DD`.
+    - `parseMessyPrice()`: Strips currency symbols (`'$4.50'`, `'12.00 INR'`) to extract numeric floats.
+    - **Deduplication**: Detects duplicates within the payload or existing database batch numbers.
+    - **Rejection**: Rejects entries with null/missing required batch numbers or unparseable quantities/dates.
+  - Returns required grading schema: `{ imported, deduped, rejected, details }`.
+
+### Level 3 — T1 (Integration & Notification Outbox Service `/outbox`)
+- **Requirement**: Dispatch re-order alert messages to a Notification Service outbox when in-date stock for a medicine drops below threshold, graded via `/outbox`.
+- **Implementation**:
+  - Created persistent `outbox` table in SQLite database (`id`, `type`, `medicine_id`, `medicine_name`, `current_stock`, `reorder_level`, `payload`, `status`).
+  - Automatically calculates true sellable in-date stock for medicines. If `sellable_stock <= reorder_level`, inserts a `REORDER_ALERT` notification message into the outbox.
+  - Endpoints `GET /outbox` and `POST /outbox` allow external notification consumers or automated grading harnesses to inspect and trigger re-order alerts.
+

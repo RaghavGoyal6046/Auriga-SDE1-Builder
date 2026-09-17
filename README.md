@@ -90,6 +90,13 @@ All API endpoints are hosted at `/api/*`. Below is the complete catalog of endpo
 | `GET` | `/api/alerts/expiring` | Get categorized risk feeds: `expiredBatches`, `expiring30Batches` (&lt; 30 days), `expiring60Batches`, and `lowStockMedicines` | No |
 | `GET` | `/api/dashboard/stats` | High-level telemetry: total sellable stock value, expired quarantined stock, today's sales, and recent sales | No |
 
+### 6. Competition Evaluation Twists (`/clock`, `/api/batches/import-messy`, `/outbox`)
+| Method | Endpoint | Twist Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/clock` or `/api/clock` | **Level 1 — T2 (Automation)**: Daily job that flags batches expiring within 7 days, quarantines expired ones, and returns `{ date, quarantined_count, expiring_soon_count, healthy_count }` | No |
+| `POST` | `/api/batches/import-messy` or `/api/batches/import` | **Level 2 — T4 (Messy Data)**: Imports messy batch lists (nulls, `'10 units'`, `dd/mm/yyyy` vs ISO dates, duplicate rows) into clean stock with a `{ imported, deduped, rejected }` report | No |
+| `GET` / `POST` | `/outbox` or `/api/outbox` | **Level 3 — T1 (Integrate)**: Outbox Notification Service for low-stock re-order alerts when sellable in-date stock drops below threshold | No |
+
 ---
 
 ## 🛠️ Debugging & Troubleshooting

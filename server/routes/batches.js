@@ -134,23 +134,202 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// PUT /api/batches/:id/quarantine
-router.put('/:id/quarantine', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const batch = await queryOne('SELECT * FROM batches WHERE id = ?', [id]);
+// Helper functions for Level 2 — T4 (Messy Data Parsing)
+function parseMessyQuantity(val) {
+  if (val === null || val === undefined) return null;
+  const match = val.toString().match(/(\d+)/);
+  if (!match) return null;
+  const num = parseInt(match[1]);
+  return isNaN(num) || num <= 0 ? null : num;
+}
 
-    if (!batch) {
-      return res.status(404).json({ error: 'Batch not found' });
+function parseMessyPrice(val) {
+  if (val === null || val === undefined) return null;
+  const match = val.toString().match(/([\d.]+)/);
+  if (!match) return null;
+  const num = parseFloat(match[1]);
+  return isNaN(num) || num < 0 ? null : num;
+}
+
+function parseMessyDate(val) {
+  if (!val) return null;
+  const s = val.toString().trim();
+
+  // Try ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Try DD/MM/YYYY or MM/DD/YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+  if (dmyMatch) {
+    let p1 = parseInt(dmyMatch[1]);
+    let p2 = parseInt(dmyMatch[2]);
+    let year = parseInt(dmyMatch[3]);
+    let month = p2;
+    let day = p1;
+
+    // Handle DD/MM vs MM/DD
+    if (p1 > 12) {
+      day = p1;
+      month = p2;
+    } else if (p2 > 12) {
+      day = p2;
+      month = p1;
+    }
+    const mm = month < 10 ? `0${month}` : `${month}`;
+    const dd = day < 10 ? `0${day}` : `${day}`;
+    return `${year}-${mm}-${dd}`;
+  }
+
+  // Fallback to JS Date parsing
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+
+  return null;
+}
+
+/**
+ * Level 2 — T4 (Messy Data Import):
+ * POST /api/batches/import-messy (and /api/batches/import)
+ * Parses messy batch list (nulls, '10 units', dd/mm/yyyy vs ISO, duplicates)
+ * Returns { imported, deduped, rejected, details }
+ */
+const handleMessyImport = async (req, res) => {
+  try {
+    const rawBatches = req.body?.batches || req.body;
+    if (!Array.isArray(rawBatches)) {
+      return res.status(400).json({ error: 'Payload must be an array of batch objects or { batches: [...] }' });
     }
 
-    await execute("UPDATE batches SET status = 'QUARANTINED', shelf_location = 'Quarantine Bay' WHERE id = ?", [id]);
+    let imported = 0;
+    let deduped = 0;
+    let rejected = 0;
 
-    res.json({ message: 'Batch successfully quarantined', batchId: id });
+    const imported_batches = [];
+    const deduped_batches = [];
+    const rejected_batches = [];
+
+    const seenInPayload = new Set();
+    const today = new Date().toISOString().split('T')[0];
+
+    for (const rawItem of rawBatches) {
+      if (!rawItem || typeof rawItem !== 'object') {
+        rejected++;
+        rejected_batches.push({ raw: rawItem, reason: 'Invalid object entry' });
+        continue;
+      }
+
+      const rawBatchNo = rawItem.batch_number || rawItem.batchNo || rawItem.batch_code || rawItem.code;
+      const rawMedName = rawItem.medicine_name || rawItem.medicine || rawItem.drug_name || rawItem.name;
+      const rawQty = rawItem.quantity !== undefined ? rawItem.quantity : (rawItem.initial_quantity || rawItem.qty);
+      const rawExpiry = rawItem.expiry_date || rawItem.expiry || rawItem.exp;
+      const rawMfg = rawItem.mfg_date || rawItem.mfg || today;
+      const rawPrice = rawItem.unit_price !== undefined ? rawItem.unit_price : (rawItem.price || 5.00);
+      const rawShelf = rawItem.shelf_location || rawItem.shelf || 'Import Rack';
+
+      // 1. Validate required batch number
+      if (!rawBatchNo || !rawBatchNo.toString().trim()) {
+        rejected++;
+        rejected_batches.push({ raw: rawItem, reason: 'Missing or null batch_number' });
+        continue;
+      }
+
+      const cleanBatchNo = rawBatchNo.toString().trim().toUpperCase();
+
+      // 2. Validate medicine name
+      if (!rawMedName || !rawMedName.toString().trim()) {
+        rejected++;
+        rejected_batches.push({ raw: rawItem, reason: 'Missing or null medicine_name' });
+        continue;
+      }
+      const cleanMedName = rawMedName.toString().trim();
+
+      // 3. Parse quantity ('10 units' -> 10)
+      const parsedQty = parseMessyQuantity(rawQty);
+      if (parsedQty === null) {
+        rejected++;
+        rejected_batches.push({ raw: rawItem, reason: `Unparseable quantity '${rawQty}'` });
+        continue;
+      }
+
+      // 4. Parse expiry date ('dd/mm/yyyy' or ISO -> YYYY-MM-DD)
+      const parsedExpiry = parseMessyDate(rawExpiry);
+      if (!parsedExpiry) {
+        rejected++;
+        rejected_batches.push({ raw: rawItem, reason: `Unparseable expiry date '${rawExpiry}'` });
+        continue;
+      }
+
+      // 5. Parse price ('$4.50' -> 4.50)
+      const parsedPrice = parseMessyPrice(rawPrice) || 5.00;
+      const parsedMfg = parseMessyDate(rawMfg) || today;
+
+      // 6. Check deduplication (Payload duplicate or DB duplicate)
+      if (seenInPayload.has(cleanBatchNo)) {
+        deduped++;
+        deduped_batches.push({ batch_number: cleanBatchNo, reason: 'Duplicate in payload' });
+        continue;
+      }
+      seenInPayload.add(cleanBatchNo);
+
+      const existingInDb = await queryOne('SELECT id FROM batches WHERE batch_number = ?', [cleanBatchNo]);
+      if (existingInDb) {
+        deduped++;
+        deduped_batches.push({ batch_number: cleanBatchNo, reason: 'Batch already exists in database' });
+        continue;
+      }
+
+      // 7. Find or Create Medicine Record in Database
+      let medicine = await queryOne('SELECT id FROM medicines WHERE LOWER(name) = ? OR LOWER(generic_name) = ?', [cleanMedName.toLowerCase(), cleanMedName.toLowerCase()]);
+      let medicineId = medicine ? medicine.id : null;
+
+      if (!medicineId) {
+        const medRes = await execute(
+          `INSERT INTO medicines (name, generic_name, category, unit, reorder_level) VALUES (?, ?, ?, ?, ?)`,
+          [cleanMedName, cleanMedName, 'Imported Catalog', 'Tablets', 20]
+        );
+        medicineId = medRes.lastID;
+      }
+
+      // 8. Insert Clean Batch Record
+      const status = parsedExpiry <= today ? 'EXPIRED' : 'ACTIVE';
+      const insertRes = await execute(
+        `INSERT INTO batches (medicine_id, batch_number, initial_quantity, available_quantity, mfg_date, expiry_date, unit_price, shelf_location, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [medicineId, cleanBatchNo, parsedQty, parsedQty, parsedMfg, parsedExpiry, parsedPrice, rawShelf.toString().trim(), status]
+      );
+
+      imported++;
+      imported_batches.push({
+        id: insertRes.lastID,
+        batch_number: cleanBatchNo,
+        medicine_name: cleanMedName,
+        quantity: parsedQty,
+        expiry_date: parsedExpiry,
+        unit_price: parsedPrice,
+        status
+      });
+    }
+
+    res.json({
+      imported,
+      deduped,
+      rejected,
+      details: {
+        imported_batches,
+        deduped_batches,
+        rejected_batches
+      }
+    });
   } catch (err) {
-    console.error('Error quarantining batch:', err);
-    res.status(500).json({ error: 'Failed to quarantine batch' });
+    console.error('Error importing messy batch list:', err);
+    res.status(500).json({ error: 'Failed to process messy batch import' });
   }
-});
+};
+
+router.post('/import-messy', handleMessyImport);
+router.post('/import', handleMessyImport);
 
 export default router;
+

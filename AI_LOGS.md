@@ -198,4 +198,19 @@
 > - **Frontend (`RegisterPage.jsx`)**: Unblocked public registration form view and added real-time status banner alerting the registrant that their account will automatically be created with Primary Admin privileges. Tested live API registration (`HTTP 201 Created`, `role: Admin`) and pushed updates to GitHub.
 
 ---
+
+### Turn 18: Competition Evaluation Twists (Automation, Messy Import & Outbox Notification)
+> **User Prompt**:  
+> "Implement the competition evaluation twists:  
+> 1. Level 1 — T2 (automation): A daily job flags batches expiring within 7 days and quarantines expired ones, graded via POST /clock.  
+> 2. Level 2 — T4 (messy data): Import a messy batch list (nulls, '10 units', dd/mm/yyyy vs ISO dates, duplicate rows) into correct stock with an { imported, deduped, rejected } report.  
+> 3. Level 3 — T1 (integrate): When in-date stock for a medicine drops below a threshold, send a re-order alert via the Notification Service, graded via /outbox."
+
+> **AI Assistant Response**:  
+> Implemented all 3 evaluation twists across backend endpoints and SQLite schema:
+> - **Level 1 — T2 (`POST /clock` & `POST /api/clock`)**: Created `server/routes/clock.js` executing daily automated status checks: quarantines expired batches (`expiry_date < date`), flags 7-day expiry risk batches, and returns `{ date, quarantined_count, expiring_soon_count, healthy_count }`. Tested live with date simulation.
+> - **Level 2 — T4 (`POST /api/batches/import-messy` & `POST /api/batches/import`)**: Built regex-based cleaning and deduplication parser in `server/routes/batches.js` parsing non-standard quantities (`'10 units'`), currency strings (`'$4.50'`), non-standard dates (`dd/mm/yyyy`), and payload/DB duplicates. Returns `{ imported, deduped, rejected, details }`. Tested live (`imported: 2, deduped: 1, rejected: 2`).
+> - **Level 3 — T1 (`GET /outbox` & `POST /outbox`)**: Added persistent `outbox` table in SQLite and `server/routes/outbox.js`. Automatically generates `REORDER_ALERT` notification entries whenever sellable in-date stock drops below medicine reorder levels. Tested live API responses and pushed updates to GitHub.
+
+---
 *End of Conversation Log.*

