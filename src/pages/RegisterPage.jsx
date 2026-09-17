@@ -9,6 +9,7 @@ export default function RegisterPage() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Pharmacist');
   const [error, setError] = useState('');
@@ -50,7 +51,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, phone, password, role }),
       });
 
       const data = await res.json();
@@ -63,6 +64,7 @@ export default function RegisterPage() {
         setSuccessMsg(`Success! Created ${data.user.role} account for ${data.user.name}.`);
         setName('');
         setEmail('');
+        setPhone('');
         setPassword('');
         fetchSystemStatus();
       }

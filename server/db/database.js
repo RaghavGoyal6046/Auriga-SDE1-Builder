@@ -51,10 +51,18 @@ export async function initDatabase() {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
+      phone TEXT,
       role TEXT DEFAULT 'Pharmacist',
+      reset_otp TEXT,
+      reset_otp_expiry DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Safely ensure phone and reset_otp columns exist for backward compatibility
+  try { await execute('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (_) {}
+  try { await execute('ALTER TABLE users ADD COLUMN reset_otp TEXT'); } catch (_) {}
+  try { await execute('ALTER TABLE users ADD COLUMN reset_otp_expiry DATETIME'); } catch (_) {}
 
   await execute(`
     CREATE TABLE IF NOT EXISTS medicines (
@@ -111,40 +119,6 @@ export async function initDatabase() {
       FOREIGN KEY (batch_id) REFERENCES batches(id)
     )
   `);
-
-  // Ensure user account for raghavgoyal6046@gmail.com exists
-  const salt = bcrypt.genSaltSync(10);
-  const adminPass = bcrypt.hashSync('admin123', salt);
-  const pharmacistPass = bcrypt.hashSync('pharmacy123', salt);
-
-  const existingRaghav = await queryOne('SELECT id FROM users WHERE email = ?', ['raghavgoyal6046@gmail.com']);
-  if (!existingRaghav) {
-    await execute(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      ['Raghav Goyal', 'raghavgoyal6046@gmail.com', adminPass, 'Admin']
-    );
-  }
-
-  // 2. Check if users table is empty and seed initial data
-  const userCountRow = await queryOne('SELECT COUNT(*) as count FROM users');
-  if (userCountRow.count <= 1) {
-    console.log('Seeding initial database data...');
-
-    const existingAdmin = await queryOne('SELECT id FROM users WHERE email = ?', ['admin@pharma.com']);
-    if (!existingAdmin) {
-      await execute(
-        'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        ['Dr. Rajesh Sharma', 'admin@pharma.com', adminPass, 'Admin']
-      );
-    }
-
-    const existingPharm = await queryOne('SELECT id FROM users WHERE email = ?', ['pharmacist@pharma.com']);
-    if (!existingPharm) {
-      await execute(
-        'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        ['Pooja Nair', 'pharmacist@pharma.com', pharmacistPass, 'Pharmacist']
-      );
-    }
 
     // Seed Medicines
     const insertMed = async (name, generic_name, category, unit, reorder_level) => {
@@ -213,7 +187,6 @@ export async function initDatabase() {
     }
 
     console.log('Database seeded successfully with initial FEFO sample dataset!');
-  }
 }
 
 export default db;

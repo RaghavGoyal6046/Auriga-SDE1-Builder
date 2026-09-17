@@ -171,4 +171,20 @@
 > - **Medical Workbench & Telemetry**: Redesigned Landing, Dashboard, POS Workbench, and Catalog views to provide a premium enterprise pharmacy ERP aesthetic. Verified build (`npm run build`) and pushed updates to GitHub.
 
 ---
+
+### Turn 16: Dynamic Admin Authentication & Google/Mobile OTP Password Recovery
+> **User Prompt**:  
+> "Remove hardcoded admin ID and password credentials to enforce proper dynamic authentication. Implement password recovery allowing Admins to reset passwords using Google Account and Mobile SMS OTP verification."
+
+> **AI Assistant Response**:  
+> Upgraded authentication infrastructure in `server/routes/auth.js`, `server/db/database.js`, and `LoginPage.jsx`:
+> - **Dynamic Credentials**: Removed hardcoded seeds from `server/db/database.js` to ensure credentials are generated dynamically via secure bcrypt hashing. Added `phone`, `reset_otp`, and `reset_otp_expiry` columns to SQLite `users` table.
+> - **OTP & Google Password Recovery Endpoints**:
+>   - `POST /api/auth/request-otp`: Dispatches 6-digit verification code to Google Email or Mobile SMS.
+>   - `POST /api/auth/verify-otp`: Validates 6-digit OTP code against expiry timestamp.
+>   - `POST /api/auth/reset-password`: Updates user password in SQLite using bcrypt hashing.
+>   - `POST /api/auth/google-auth`: Provides seamless Google Account authentication.
+> - **Interactive Recovery UI**: Built a 3-step Password Recovery Modal on `LoginPage.jsx` supporting Google & Mobile SMS OTP verification. Verified E2E flow (`HTTP 200 OK`) and pushed updates to GitHub.
+
+---
 *End of Conversation Log.*
