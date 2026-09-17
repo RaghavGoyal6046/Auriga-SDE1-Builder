@@ -1,12 +1,44 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { queryOne, execute } from '../db/database.js';
+import { queryOne, queryAll, execute } from '../db/database.js';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// POST /api/auth/register
+// GET /api/auth/system-status (Check if initial setup / owner exists)
+router.get('/system-status', async (req, res) => {
+  try {
+    const userCountRes = await queryOne('SELECT COUNT(*) as count FROM users');
+    const adminCountRes = await queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'Admin'");
+    
+    res.json({
+      userCount: userCountRes.count,
+      hasAdmin: adminCountRes.count > 0,
+      isFirstSetup: userCountRes.count === 0
+    });
+  } catch (err) {
+    console.error('Error fetching system status:', err);
+    res.status(500).json({ error: 'Failed to fetch system status' });
+  }
+});
+
+// GET /api/auth/users (List staff accounts - Admin only)
+router.get('/users', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ error: 'Access Denied: Admin authorization required' });
+  }
+
+  try {
+    const users = await queryAll('SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC');
+    res.json({ users });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ error: 'Failed to fetch users list' });
+  }
+});
+
+// POST /api/auth/register (First setup = Admin, subsequent = Admin authorization required)
 router.post('/register', async (req, res) => {
   const { name, email, password, role } = req.body || {};
 
@@ -21,9 +53,38 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
+    const userCountRes = await queryOne('SELECT COUNT(*) as count FROM users');
+    let userRole = 'Pharmacist';
+
+    // Case 1: First registration EVER -> Automatically becomes Admin (Pharmacy Owner)
+    if (userCountRes.count === 0) {
+      userRole = 'Admin';
+    } else {
+      // Case 2: Subsequent registration -> Requires Admin Bearer token authorization
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      if (!token) {
+        return res.status(403).json({
+          error: 'Access Denied: Only an Admin (Pharmacy Owner) can add new Pharmacist or Owner accounts.'
+        });
+      }
+
+      try {
+        const decodedUser = jwt.verify(token, JWT_SECRET);
+        if (decodedUser.role !== 'Admin') {
+          return res.status(403).json({
+            error: 'Access Denied: Only an Admin (Pharmacy Owner) can add new staff accounts.'
+          });
+        }
+        userRole = role === 'Admin' ? 'Admin' : 'Pharmacist';
+      } catch (tokenErr) {
+        return res.status(403).json({ error: 'Invalid or expired Admin authorization token' });
+      }
+    }
+
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(password.toString(), salt);
-    const userRole = role === 'Admin' ? 'Admin' : 'Pharmacist';
 
     const result = await execute(
       `INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`,
@@ -40,7 +101,9 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: userCountRes.count === 0
+        ? 'First Pharmacy Owner (Admin) registered successfully'
+        : `${userRole} account created successfully by Admin`,
       token,
       user
     });

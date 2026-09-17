@@ -126,4 +126,17 @@
 > Built and executed a 7-step automated E2E audit test suite (`server/tests/fefo.test.js`) verifying API health, JWT auth, in-date stock inspection, catalog pagination, FEFO allocation preview, stock deduction, and dashboard metrics (100% PASS). Added **CSV Export** functionality to `InventoryPage.jsx`, verified production build (`npm run build`), and pushed final release to GitHub.
 
 ---
+
+### Turn 12: Admin Authorization & First-User Owner Policy Enforcement
+> **User Prompt**:  
+> "Enforce role security policy: The very first registered user in the system automatically becomes the Primary Pharmacy Owner (Admin). Creating subsequent Pharmacist or Owner accounts requires authorization from an authenticated Admin."
+
+> **AI Assistant Response**:  
+> Implemented Role-Based Access Control (RBAC) in `server/routes/auth.js` and `RegisterPage.jsx`:
+> - Added `/api/auth/system-status` to inspect system initialization state.
+> - **First Setup**: The first registration automatically forces `role = 'Admin'` (Primary Pharmacy Owner).
+> - **Subsequent Registrations**: Creating new staff accounts (Pharmacist/Admin) validates the requesting user's Bearer JWT token and requires `req.user.role === 'Admin'`.
+> - **UI Security Shield**: `RegisterPage.jsx` displays authorization status and blocks unauthorized public staff creation attempts. Pushed changes to GitHub.
+
+---
 *End of Conversation Log.*
