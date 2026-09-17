@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Package, Search, Plus, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, ArrowUpDown, Download } from 'lucide-react';
 
 export default function InventoryPage() {
   const [medicines, setMedicines] = useState([]);
@@ -48,6 +48,29 @@ export default function InventoryPage() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (medicines.length === 0) return;
+    const headers = ['ID', 'Brand Name', 'Generic Name', 'Category', 'Unit', 'Sellable Stock', 'Expired Stock'];
+    const rows = medicines.map((m) => [
+      m.id,
+      `"${m.name}"`,
+      `"${m.generic_name || ''}"`,
+      `"${m.category}"`,
+      m.unit,
+      m.sellable_stock,
+      m.expired_stock
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Pharma_Inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleCreateMedicine = async (e) => {
     e.preventDefault();
     setModalError('');
@@ -94,12 +117,20 @@ export default function InventoryPage() {
           <p className="text-xs text-gray-400 mt-1">Master list of pharmaceutical inventory with sellable stock breakdown</p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary text-xs py-2.5 px-4 shadow-lg shadow-cyan-500/20 shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Add New Medicine
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="btn-secondary text-xs py-2.5 px-3 shrink-0"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-primary text-xs py-2.5 px-4 shadow-lg shadow-cyan-500/20 shrink-0"
+          >
+            <Plus className="w-4 h-4" /> Add New Medicine
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -209,7 +240,7 @@ export default function InventoryPage() {
                     <td>
                       <button
                         onClick={() => handleViewDetail(med.id)}
-                        className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold transition-all flex items-center gap-1"
+                        className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" /> Batches
                       </button>
