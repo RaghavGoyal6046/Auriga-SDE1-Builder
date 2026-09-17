@@ -38,13 +38,19 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2.5 text-decoration-none">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
-              <Pill className="w-5 h-5" />
+          <Link to="/" className="flex items-center gap-3 text-decoration-none group">
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 group-hover:scale-105 transition-all">
+              <Pill className="w-5 h-5 text-white" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#070b14] animate-pulse"></span>
             </div>
             <div>
-              <span className="font-outfit font-extrabold text-xl tracking-tight text-white">Pharma<span className="text-cyan-400">Expiry</span></span>
-              <span className="block text-[10px] uppercase font-semibold tracking-wider text-cyan-400/80 -mt-1">FEFO Engine v1.0</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-xl tracking-tight text-white">Pharma<span className="text-emerald-400">Companion</span></span>
+                <span className="hidden xl:inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  CLINICAL FEFO ERP
+                </span>
+              </div>
+              <span className="block text-[10px] font-medium tracking-wider text-teal-400/90 -mt-0.5">Expiry Prevention Engine</span>
             </div>
           </Link>
 

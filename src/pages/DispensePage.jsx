@@ -127,7 +127,7 @@ export default function DispensePage() {
             <span className="badge badge-green">FEFO ENGINE ACTIVE</span>
             <span className="text-xs text-gray-400">Strict Earliest-Expiry-First Deductions</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">FEFO Dispense Terminal (POS)</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">PharmaCompanion Clinical Dispensing Terminal</h1>
         </div>
       </div>
 

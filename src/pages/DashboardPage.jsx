@@ -144,12 +144,12 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Pharmacy Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">PharmaCompanion Telemetry</h1>
             <span className={`badge ${isAdmin ? 'badge-yellow' : 'badge-green'} text-[11px]`}>
-              {isAdmin ? 'ADMIN / OWNER MODE' : 'PHARMACIST MODE'}
+              {isAdmin ? 'CHIEF PHARMACIST / OWNER' : 'PHARMACIST WORKBENCH'}
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Real-time FEFO Inventory & Sales Analytics</p>
+          <p className="text-xs text-emerald-400/90 font-medium mt-1">Real-Time FEFO Inventory & Clinical Dispensing Analytics</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">

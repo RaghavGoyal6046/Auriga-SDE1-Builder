@@ -24,18 +24,18 @@ export default function LandingPage() {
         <div className="absolute top-1/3 right-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
         <div className="text-center max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-6">
             <Sparkles className="w-3.5 h-3.5" />
-            First-Expiry-First-Out (FEFO) Inventory Engine
+            PharmaCompanion FEFO Expiry ERP & Clinical Inventory Engine
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-extrabold font-outfit tracking-tight text-white leading-tight">
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
             Never Dispense Expired Stock. <br />
-            <span className="gradient-text">Dispense Oldest-First, Automatically.</span>
+            <span className="gradient-text">Empower Your Pharmacy with FEFO Precision.</span>
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto font-normal">
-            PharmaExpiry protects neighbourhood pharmacies by enforcing strict batch-level FEFO logic. Know your true sellable stock, receive proactive expiry alerts, and answer availability questions in seconds.
+            PharmaCompanion protects clinical and retail pharmacies by enforcing strict batch-level FEFO logic. Know your true sellable stock, receive proactive expiry alerts, and answer stock availability questions in seconds.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
