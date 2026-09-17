@@ -213,4 +213,15 @@
 > - **Level 3 — T1 (`GET /outbox` & `POST /outbox`)**: Added persistent `outbox` table in SQLite and `server/routes/outbox.js`. Automatically generates `REORDER_ALERT` notification entries whenever sellable in-date stock drops below medicine reorder levels. Tested live API responses and pushed updates to GitHub.
 
 ---
+
+### Turn 19: Dynamic Interactive Google Account OAuth Sign-In Flow
+> **User Prompt**:  
+> "Refine Google authentication so it dynamically prompts the user to enter their actual Google Account email and name instead of logging in with hardcoded admin preset details."
+
+> **AI Assistant Response**:  
+> Built an interactive Google OAuth Sign-In Modal on `LoginPage.jsx`:
+> - **Account Selector Modal**: Clicking **"Sign In with Google Account"** opens an interactive dialog prompting the user for their **Google Account Email Address** (e.g. `yourname@gmail.com`) and **Full Name**.
+> - **Dynamic Registration & Sign-In**: Submits the user-provided email and name to `POST /api/auth/google-auth`. If 0 admins exist, the user is created as Primary Admin; otherwise, signs them in or registers them dynamically with their exact entered Google name & email. Verified production build (`npm run build`) and pushed updates to GitHub.
+
+---
 *End of Conversation Log.*
