@@ -139,7 +139,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="mt-3">
-            <p className="text-2xl font-extrabold text-emerald-400">${stats?.todaySales?.revenue?.toFixed(2)}</p>
+            <p className="text-2xl font-extrabold text-emerald-400">${(stats?.todaySales?.revenue || 0).toFixed(2)}</p>
             <p className="text-xs text-gray-400 mt-1">{stats?.todaySales?.count} Dispense Orders</p>
           </div>
           <div className="mt-3 pt-2 border-t border-white/5">

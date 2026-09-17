@@ -43,13 +43,14 @@ router.get('/stats', async (req, res) => {
       [today, date30Str]
     );
 
-    // Today's Sales
+    // Today's Sales (matching today's date in UTC or local date)
     const todaySalesRes = await queryOne(
       `SELECT 
          COUNT(*) as count,
-         COALESCE(SUM(total_amount), 0) as total_revenue
+         COALESCE(SUM(total_amount), 0) as revenue
        FROM dispense_records
-       WHERE date(dispensed_at) = date('now')`
+       WHERE date(dispensed_at) = date('now') OR date(dispensed_at) = ?`,
+      [today]
     );
 
     // Recent Dispense Transactions (last 5)
@@ -62,22 +63,22 @@ router.get('/stats', async (req, res) => {
     );
 
     res.json({
-      medicinesCount: medCount.count,
-      batchesCount: batchCount.count,
+      medicinesCount: medCount?.count || 0,
+      batchesCount: batchCount?.count || 0,
       sellableStock: {
-        units: sellableStockRes.total_units,
-        value: sellableStockRes.total_value
+        units: sellableStockRes?.total_units || 0,
+        value: sellableStockRes?.total_value || 0
       },
       expiredStock: {
-        units: expiredStockRes.total_units,
-        value: expiredStockRes.total_value
+        units: expiredStockRes?.total_units || 0,
+        value: expiredStockRes?.total_value || 0
       },
-      expiringSoonCount: expiringSoonRes.count,
+      expiringSoonCount: expiringSoonRes?.count || 0,
       todaySales: {
-        count: todaySalesRes.count,
-        revenue: todaySalesRes.revenue
+        count: todaySalesRes?.count || 0,
+        revenue: todaySalesRes?.revenue || 0
       },
-      recentDispenses
+      recentDispenses: recentDispenses || []
     });
   } catch (err) {
     console.error('Error fetching dashboard stats:', err);
