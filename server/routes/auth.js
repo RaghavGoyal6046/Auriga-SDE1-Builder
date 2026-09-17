@@ -1,7 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import { queryOne, queryAll, execute } from '../db/database.js';
 import { JWT_SECRET, JWT_EXPIRES_IN, authenticateToken } from '../middleware/auth.js';
@@ -9,7 +8,6 @@ import { loginRateLimiter, otpRateLimiter } from '../middleware/security.js';
 import { generateAndSendOtp, verifyOtpCode } from '../services/otpService.js';
 
 const router = express.Router();
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * Helper to count total registered users across MongoDB and SQLite
@@ -72,7 +70,7 @@ router.post('/register', async (req, res) => {
     // Check if public registration is disabled
     if (userCount > 0) {
       return res.status(403).json({
-        error: 'Public registration is disabled. Only an authenticated ADMIN can add new accounts. Please contact the pharmacy administrator.',
+        error: 'Public registration is disabled. Only an authenticated ADMIN can add new staff accounts. Please contact the pharmacy administrator.',
       });
     }
 
@@ -250,7 +248,6 @@ router.get('/me', authenticateToken, (req, res) => {
       role: user.role,
       isActive: user.isActive !== false,
       isVerified: user.isVerified !== false,
-      googleId: user.googleId || null,
       createdAt: user.createdAt || new Date().toISOString(),
     },
   });
@@ -261,28 +258,28 @@ router.get('/me', authenticateToken, (req, res) => {
  * Generates and sends a 6-digit email OTP.
  */
 router.post('/request-otp', otpRateLimiter, async (req, res) => {
-  const { email, purpose } = req.body || {};
+  const { email, identifier, purpose } = req.body || {};
+  const targetEmail = (email || identifier || '').toString().toLowerCase().trim();
 
-  if (!email) {
-    return res.status(400).json({ error: 'Email address is required' });
+  if (!targetEmail) {
+    return res.status(400).json({ error: 'Registered email address is required' });
   }
 
   try {
-    const cleanEmail = email.toString().toLowerCase().trim();
     let user = null;
     try {
-      user = await User.findOne({ email: cleanEmail });
+      user = await User.findOne({ email: targetEmail });
     } catch (_) {}
 
     const otpRes = await generateAndSendOtp(
-      cleanEmail,
+      targetEmail,
       purpose || 'EMAIL_VERIFICATION',
       user ? user._id : null,
       user ? user.name : ''
     );
 
     res.json({
-      message: `Verification OTP dispatched to ${cleanEmail}`,
+      message: `Verification OTP dispatched to ${targetEmail}`,
       expiresAt: otpRes.expiresAt,
       otp: otpRes.rawOtp, // For local dev testing convenience
     });
@@ -297,15 +294,15 @@ router.post('/request-otp', otpRateLimiter, async (req, res) => {
  * Verifies 6-digit OTP code and activates account.
  */
 router.post('/verify-otp', async (req, res) => {
-  const { email, otp, newPassword, purpose } = req.body || {};
+  const { email, identifier, otp, newPassword, purpose } = req.body || {};
+  const targetEmail = (email || identifier || '').toString().toLowerCase().trim();
 
-  if (!email || !otp) {
+  if (!targetEmail || !otp) {
     return res.status(400).json({ error: 'Email and OTP code are required' });
   }
 
   try {
-    const cleanEmail = email.toString().toLowerCase().trim();
-    const result = await verifyOtpCode(cleanEmail, otp, purpose || 'EMAIL_VERIFICATION');
+    const result = await verifyOtpCode(targetEmail, otp, purpose || 'EMAIL_VERIFICATION');
 
     if (!result.valid) {
       return res.status(400).json({ error: result.message });
@@ -314,7 +311,7 @@ router.post('/verify-otp', async (req, res) => {
     // Find and verify User in MongoDB
     let user = null;
     try {
-      user = await User.findOne({ email: cleanEmail }).select('+passwordHash');
+      user = await User.findOne({ email: targetEmail }).select('+passwordHash');
       if (user) {
         user.isVerified = true;
         user.isActive = true;
@@ -330,7 +327,7 @@ router.post('/verify-otp', async (req, res) => {
     if (newPassword) {
       const salt = bcrypt.genSaltSync(10);
       const passwordHash = bcrypt.hashSync(newPassword.toString(), salt);
-      await execute('UPDATE users SET password = ? WHERE LOWER(email) = ?', [passwordHash, cleanEmail]);
+      await execute('UPDATE users SET password = ? WHERE LOWER(email) = ?', [passwordHash, targetEmail]);
     }
 
     res.json({
@@ -343,152 +340,5 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-/**
- * GET /api/auth/google / POST /api/auth/google/verify-token
- * Google OAuth 2.0 / OpenID Connect Identity Handler
- * Rules:
- * - Links googleId if user exists with matching verified email (preserves role!).
- * - First Google account becomes ADMIN if 0 users exist.
- * - Rejects uninvited Google users with "Your Google account has not been invited by the pharmacy administrator."
- */
-const handleGoogleAuth = async (req, res) => {
-  const { email, name, googleId, credential } = req.body || {};
-
-  try {
-    let targetEmail = email ? email.toString().toLowerCase().trim() : null;
-    let targetName = name || '';
-    let targetGoogleId = googleId || null;
-
-    // Optional Google ID Token verification if credential provided
-    if (credential && process.env.GOOGLE_CLIENT_ID) {
-      try {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: credential,
-          audience: process.env.GOOGLE_CLIENT_ID,
-        });
-        const payload = ticket.getPayload();
-        targetEmail = payload.email.toLowerCase().trim();
-        targetName = payload.name;
-        targetGoogleId = payload.sub;
-      } catch (tokenErr) {
-        return res.status(400).json({ error: 'Invalid Google Identity token' });
-      }
-    }
-
-    if (!targetEmail) {
-      return res.status(400).json({ error: 'Google account email is required' });
-    }
-
-    // 1. Check existing user in MongoDB
-    let user = null;
-    try {
-      user = await User.findOne({
-        $or: [{ email: targetEmail }, { googleId: targetGoogleId }],
-      });
-    } catch (_) {}
-
-    if (!user) {
-      const sqliteUser = await queryOne('SELECT * FROM users WHERE LOWER(email) = ?', [targetEmail]);
-      if (sqliteUser) {
-        user = {
-          _id: sqliteUser.id,
-          id: sqliteUser.id,
-          name: sqliteUser.name,
-          email: sqliteUser.email,
-          role: sqliteUser.role.toUpperCase(),
-          isActive: true,
-          isVerified: true,
-        };
-      }
-    }
-
-    const userCount = await getTotalUserCount();
-
-    // Case A: User exists -> Link Google ID if not linked, preserve role!
-    if (user) {
-      if (user.isActive === false) {
-        return res.status(403).json({ error: 'Your account has been deactivated. Please contact the administrator.' });
-      }
-
-      try {
-        if (!user.googleId && targetGoogleId) {
-          user.googleId = targetGoogleId;
-          await user.save();
-        }
-      } catch (_) {}
-
-      const userPayload = {
-        id: user._id || user.id,
-        userId: user._id || user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive: true,
-        isVerified: true,
-      };
-
-      const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
-      return res.json({
-        message: `Authenticated successfully as ${user.role} via Google Account`,
-        token,
-        user: userPayload,
-      });
-    }
-
-    // Case B: No users exist at all -> First Google Account becomes ADMIN
-    if (userCount === 0) {
-      const assignedRole = 'ADMIN';
-      const salt = bcrypt.genSaltSync(10);
-      const randomPassHash = bcrypt.hashSync(Math.random().toString(36), salt);
-
-      let mongoUser = null;
-      try {
-        mongoUser = await User.create({
-          name: targetName || targetEmail.split('@')[0],
-          email: targetEmail,
-          passwordHash: randomPassHash,
-          googleId: targetGoogleId || `google-sub-${Date.now()}`,
-          role: assignedRole,
-          isActive: true,
-          isVerified: true,
-        });
-      } catch (_) {}
-
-      const userId = mongoUser ? mongoUser._id : Date.now();
-      const userPayload = {
-        id: userId,
-        userId,
-        name: targetName || targetEmail.split('@')[0],
-        email: targetEmail,
-        role: assignedRole,
-        isActive: true,
-        isVerified: true,
-      };
-
-      const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
-      return res.json({
-        message: 'First Pharmacy Owner (ADMIN) created and authenticated via Google Account!',
-        token,
-        user: userPayload,
-      });
-    }
-
-    // Case C: Users exist, but Google email is not in the system -> Reject!
-    return res.status(403).json({
-      error: 'Your Google account has not been invited by the pharmacy administrator. Please contact your Admin to create your pharmacist account first.',
-    });
-  } catch (err) {
-    console.error('Google Auth error:', err);
-    res.status(500).json({ error: 'Google authentication failed' });
-  }
-};
-
-router.post('/google', handleGoogleAuth);
-router.post('/google-auth', handleGoogleAuth);
-router.post('/google/verify-token', handleGoogleAuth);
-router.get('/google', handleGoogleAuth);
-router.get('/google/callback', handleGoogleAuth);
-
 export default router;
+
