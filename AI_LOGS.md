@@ -224,4 +224,41 @@
 > - **Dynamic Registration & Sign-In**: Submits the user-provided email and name to `POST /api/auth/google-auth`. If 0 admins exist, the user is created as Primary Admin; otherwise, signs them in or registers them dynamically with their exact entered Google name & email. Verified production build (`npm run build`) and pushed updates to GitHub.
 
 ---
+
+### Turn 20: Comprehensive Auth & RBAC Architecture Implementation
+> **User Prompt**:  
+> "Build a complete authentication and authorization system for my existing MERN stack pharmacy inventory application with roles (ADMIN and PHARMACIST), first-user bootstrapping as ADMIN, MongoDB Mongoose user model, admin pharmacist management endpoints, email OTP verification via SMTP, Google OAuth 2.0, Helmet security, rate limiting, and preserve all FEFO pharmacy business logic."
+
+> **AI Assistant Response**:  
+> Implemented complete authentication & authorization infrastructure:
+> - **MongoDB Schemas**: Created `User` schema (`name`, `email`, `passwordHash`, `role`, `isActive`, `isVerified`, `googleId`, `createdAt`, `updatedAt`, `lastLoginAt`) and `Otp` schema with TTL index.
+> - **First-User Bootstrapping**: Implemented `GET /api/auth/setup-status` and `POST /api/auth/register`. When 0 users exist, public registration creates the primary `ADMIN` account without exposing role controls. Once an Admin exists, public registration is locked out (`403 Forbidden`).
+> - **Admin Pharmacist Management**: Added `/api/admin/pharmacists` endpoints for Admin to create pharmacists (backend strictly assigns `role = "PHARMACIST"`), list with search & pagination, fetch details, and toggle active status.
+> - **Security & Middleware**: Added Express middleware (`authenticate`, `requireAdmin`, `requireAuthenticatedUser`), Helmet headers, rate limiters, JWT token generation with environment secrets, `.env.example`, and updated FEFO test suite (`npm run test:fefo`, 100% PASS).
+
+---
+
+### Turn 21: Removal of Google OAuth & Mobile OTP for Streamlined Auth
+> **User Prompt**:  
+> "Remove the authentication using mobile OTP only admin can add the staff and first will be only the owner also remove google login system."
+
+> **AI Assistant Response**:  
+> Streamlined authentication architecture per user requirements:
+> - **Removed Google Auth**: Deleted Google OAuth handlers from `server/routes/auth.js`, removed Google login buttons and Google modal from `src/pages/LoginPage.jsx`, and removed `GOOGLE_*` configuration variables.
+> - **Removed Mobile OTP**: Cleaned up password recovery modal in `src/pages/LoginPage.jsx` to remove Mobile SMS options and operate strictly via Email OTP.
+> - **Admin Staff Policy**: Confirmed first-user registration strictly bootstraps the primary Pharmacy Owner (`ADMIN`), locks public registration, and restricts staff creation exclusively to authenticated Admins.
+
+---
+
+### Turn 22: Removal of Staff OTP Verification & Direct Account Activation
+> **User Prompt**:  
+> "Remove the otp section for the staff."
+
+> **AI Assistant Response**:  
+> Simplified staff account creation and Admin management interface:
+> - **Backend (`server/routes/admin.js`)**: Updated `POST /api/admin/pharmacists` so accounts created by Admin are marked directly as `isVerified = true` and `isActive = true` with specified or default password (`pharmacy123`), bypassing OTP email verification.
+> - **Frontend UI (`DashboardPage.jsx`)**: Updated the Add Pharmacist modal form button to **"Create Pharmacist Account"**, added a Password field, and removed the "Email Verification / Pending OTP" column from the Pharmacist Roster table to display direct Account Status (`Active`/`Deactivated`). Verified build (`npm run build`) and passed all audit tests (`npm run test:fefo`).
+
+---
 *End of Conversation Log.*
+
