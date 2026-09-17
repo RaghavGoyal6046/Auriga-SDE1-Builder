@@ -1,5 +1,5 @@
 import express from 'express';
-import { queryAll, queryOne, execute } from '../db/database.js';
+import { queryAll, queryOne, execute, syncExpiredBatches } from '../db/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -7,6 +7,8 @@ const router = express.Router();
 // GET /api/batches (With search, pagination, filter, and sorting)
 router.get('/', async (req, res) => {
   try {
+    await syncExpiredBatches();
+
     const search = req.query.search || '';
     const statusFilter = req.query.status || 'ALL'; // ALL, ACTIVE, EXPIRED, EXPIRING_SOON
     const page = parseInt(req.query.page) || 1;

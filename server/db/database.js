@@ -201,6 +201,19 @@ export async function initDatabase() {
     }
 
     console.log('Database seeded successfully with initial FEFO sample dataset!');
+
+  // Sync any batch whose expiry_date <= today to EXPIRED status
+  await syncExpiredBatches();
+}
+
+export async function syncExpiredBatches() {
+  const today = new Date().toISOString().split('T')[0];
+  try {
+    await execute(`UPDATE batches SET status = 'EXPIRED' WHERE expiry_date <= ? AND status = 'ACTIVE'`, [today]);
+  } catch (err) {
+    console.warn('Sync expired batches notice:', err.message);
+  }
 }
 
 export default db;
+

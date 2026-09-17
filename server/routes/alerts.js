@@ -1,11 +1,12 @@
 import express from 'express';
-import { queryAll } from '../db/database.js';
+import { queryAll, syncExpiredBatches } from '../db/database.js';
 
 const router = express.Router();
 
 // GET /api/alerts/expiring (Risk breakdown for batches & low stock)
 router.get('/expiring', async (req, res) => {
   try {
+    await syncExpiredBatches();
     const today = new Date().toISOString().split('T')[0];
 
     const d30 = new Date();

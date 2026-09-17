@@ -1,11 +1,12 @@
 import express from 'express';
-import { queryAll, queryOne } from '../db/database.js';
+import { queryAll, queryOne, syncExpiredBatches } from '../db/database.js';
 
 const router = express.Router();
 
 // GET /api/dashboard/stats (High level telemetry)
 router.get('/stats', async (req, res) => {
   try {
+    await syncExpiredBatches();
     const today = new Date().toISOString().split('T')[0];
     const d30 = new Date();
     d30.setDate(d30.getDate() + 30);

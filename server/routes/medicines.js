@@ -1,5 +1,5 @@
 import express from 'express';
-import { queryAll, queryOne, execute } from '../db/database.js';
+import { queryAll, queryOne, execute, syncExpiredBatches } from '../db/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ router.get('/check-indate', async (req, res) => {
   }
 
   try {
+    await syncExpiredBatches();
     const today = new Date().toISOString().split('T')[0];
     const searchTerm = `%${name.trim()}%`;
 
@@ -68,6 +69,7 @@ router.get('/check-indate', async (req, res) => {
 // GET /api/medicines (With search, pagination, and sorting)
 router.get('/', async (req, res) => {
   try {
+    await syncExpiredBatches();
     const search = req.query.search || '';
     const category = req.query.category || '';
     const page = parseInt(req.query.page) || 1;
