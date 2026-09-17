@@ -156,6 +156,12 @@ h1, h2, h3, h4, h5, h6 {
   transition: border-color 0.2s ease;
 }
 
+/* Ensure padding-left when input has an icon */
+.form-input.has-icon,
+.form-input-has-icon {
+  padding-left: 2.75rem !important;
+}
+
 .form-input:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);

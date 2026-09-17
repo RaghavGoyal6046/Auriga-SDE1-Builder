@@ -58,57 +58,57 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="form-label">Full Name</label>
-            <div className="relative">
-              <User className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <User className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Dr. Ananya Sen"
-                className="form-input pl-10"
+                className="form-input has-icon"
               />
             </div>
           </div>
 
           <div>
             <label className="form-label">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Mail className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ananya@pharmacy.com"
-                className="form-input pl-10"
+                className="form-input has-icon"
               />
             </div>
           </div>
 
           <div>
             <label className="form-label">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Lock className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="form-input pl-10"
+                className="form-input has-icon"
               />
             </div>
           </div>
 
           <div>
             <label className="form-label">Role</label>
-            <div className="relative">
-              <Shield className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Shield className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="form-input pl-10"
+                className="form-input has-icon"
               >
                 <option value="Pharmacist">Pharmacist</option>
                 <option value="Admin">Admin / Pharmacy Owner</option>

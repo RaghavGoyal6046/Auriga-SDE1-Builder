@@ -61,14 +61,14 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => handleQuickDemo('pharmacist@pharma.com', 'pharmacy123')}
-              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-500/30 transition-all flex items-center justify-center gap-1"
+              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" /> Pharmacist
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('admin@pharma.com', 'admin123')}
-              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-blue-300 text-xs font-semibold rounded-lg border border-blue-500/30 transition-all flex items-center justify-center gap-1"
+              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-blue-300 text-xs font-semibold rounded-lg border border-blue-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" /> Admin
             </button>
@@ -84,30 +84,30 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="form-label">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Mail className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="e.g. pharmacist@pharma.com"
-                className="form-input pl-10"
+                className="form-input has-icon"
               />
             </div>
           </div>
 
           <div>
             <label className="form-label">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Lock className="w-4 h-4 absolute left-3.5 pointer-events-none text-gray-400 z-10" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="form-input pl-10"
+                className="form-input has-icon"
               />
             </div>
           </div>
