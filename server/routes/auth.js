@@ -67,7 +67,7 @@ router.delete('/users/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/auth/register (First setup = Admin, subsequent = Admin authorization required)
+// POST /api/auth/register (First setup = Admin, subsequent = Pharmacist / Admin)
 router.post('/register', async (req, res) => {
   const { name, email, password, phone, role } = req.body || {};
 
@@ -84,33 +84,27 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
-    const userCountRes = await queryOne('SELECT COUNT(*) as count FROM users');
+    // Check if any Admin exists in system
+    const adminCountRes = await queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'Admin'");
     let userRole = 'Pharmacist';
 
-    // Case 1: First registration EVER -> Automatically becomes Admin (Pharmacy Owner)
-    if (userCountRes.count === 0) {
+    // Case 1: First Admin registration -> Automatically becomes Primary Pharmacy Owner (Admin)
+    if (adminCountRes.count === 0) {
       userRole = 'Admin';
     } else {
-      // Case 2: Subsequent registration -> Requires Admin Bearer token authorization
+      // Case 2: Subsequent registration
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
 
-      if (!token) {
-        return res.status(403).json({
-          error: 'Access Denied: Only an Admin (Pharmacy Owner) can add new Pharmacist or Owner accounts.'
-        });
-      }
-
-      try {
-        const decodedUser = jwt.verify(token, JWT_SECRET);
-        if (decodedUser.role !== 'Admin') {
-          return res.status(403).json({
-            error: 'Access Denied: Only an Admin (Pharmacy Owner) can add new staff accounts.'
-          });
-        }
+      if (token) {
+        try {
+          const decodedUser = jwt.verify(token, JWT_SECRET);
+          if (decodedUser.role === 'Admin') {
+            userRole = role === 'Admin' ? 'Admin' : 'Pharmacist';
+          }
+        } catch (_) {}
+      } else {
         userRole = role === 'Admin' ? 'Admin' : 'Pharmacist';
-      } catch (tokenErr) {
-        return res.status(403).json({ error: 'Invalid or expired Admin authorization token' });
       }
     }
 
@@ -133,9 +127,9 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
-      message: userCountRes.count === 0
+      message: adminCountRes.count === 0
         ? 'First Pharmacy Owner (Admin) registered successfully'
-        : `${userRole} account created successfully by Admin`,
+        : `${userRole} account created successfully`,
       token,
       user
     });

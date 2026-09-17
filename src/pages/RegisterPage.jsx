@@ -76,62 +76,42 @@ export default function RegisterPage() {
   };
 
   const isAdminLoggedIn = currentUser?.role === 'Admin';
-  const isBlockedForPublic = !checkingStatus && systemStatus && !systemStatus.isFirstSetup && !isAdminLoggedIn;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full glass-panel p-8 relative">
+    <div className="min-h-screen bg-[#070b14] flex items-center justify-center px-4 py-12">
+      <div className="max-w-md w-full glass-panel p-8 relative border-emerald-500/20">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-cyan-500/30">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-600 flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-emerald-500/30">
             <Pill className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Staff Registration</h2>
-          <p className="text-xs text-gray-400 mt-1">PharmaExpiry Role Management</p>
+          <h2 className="text-2xl font-extrabold text-white tracking-tight">Staff & Owner Registration</h2>
+          <p className="text-xs text-emerald-400/80 font-medium mt-1">PharmaCompanion Account Authorization</p>
         </div>
 
         {/* System Status Banner */}
-        {systemStatus?.isFirstSetup ? (
+        {systemStatus?.isFirstSetup || !systemStatus?.hasAdmin ? (
           <div className="mb-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-center flex items-center gap-2">
             <Shield className="w-4 h-4 text-amber-400 shrink-0" />
-            <span><strong>First Setup:</strong> You are registering as the Primary Pharmacy Owner (Admin).</span>
+            <span><strong>Primary Setup Mode:</strong> As the first user, your account will automatically be created with <strong>Primary Admin / Pharmacy Owner</strong> privileges.</span>
           </div>
         ) : isAdminLoggedIn ? (
-          <div className="mb-6 p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs text-center flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span>Logged in as <strong>Admin ({currentUser.name})</strong>. You can add new Pharmacists or Owners below.</span>
+          <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs text-center flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Logged in as <strong>Admin ({currentUser.name})</strong>. You can register new Pharmacist or Owner accounts below.</span>
           </div>
         ) : null}
 
-        {isBlockedForPublic ? (
-          <div className="p-6 rounded-2xl bg-gray-900/90 border border-rose-500/30 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white">Admin Authorization Required</h3>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                Security Policy: Only an authenticated <strong>Admin / Pharmacy Owner</strong> can add new Pharmacists or Owner accounts to the system.
-              </p>
-            </div>
-            <div className="pt-2">
-              <Link to="/login" className="w-full btn-primary justify-center text-xs py-2.5">
-                Sign In as Admin / Owner →
-              </Link>
-            </div>
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+            {error}
           </div>
-        ) : (
-          <>
-            {error && (
-              <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-                {error}
-              </div>
-            )}
+        )}
 
-            {successMsg && (
-              <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
-                {successMsg}
-              </div>
-            )}
+        {successMsg && (
+          <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
+            {successMsg}
+          </div>
+        )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -209,8 +189,6 @@ export default function RegisterPage() {
                 {loading ? 'Creating Account...' : systemStatus?.isFirstSetup ? 'Complete Primary Owner Registration' : 'Add Staff Member'} <ArrowRight className="w-4 h-4 ml-1" />
               </button>
             </form>
-          </>
-        )}
 
         <p className="mt-6 text-center text-xs text-gray-400">
           Already have an account?{' '}

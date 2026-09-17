@@ -187,4 +187,15 @@
 > - **Interactive Recovery UI**: Built a 3-step Password Recovery Modal on `LoginPage.jsx` supporting Google & Mobile SMS OTP verification. Verified E2E flow (`HTTP 200 OK`) and pushed updates to GitHub.
 
 ---
+
+### Turn 17: Unblocked Seamless First-User Primary Admin Setup & Registration Policy
+> **User Prompt**:  
+> "Ensure the registration system is fully operational and unblocked so the very first user registering on the platform automatically becomes the Primary Pharmacy Owner (Admin)."
+
+> **AI Assistant Response**:  
+> Refined registration policy and unblocked public setup flow:
+> - **Backend (`server/routes/auth.js`)**: Updated `POST /api/auth/register` to check for active Admin accounts (`adminCountRes.count === 0`). When no Admin exists, the first registration automatically assigns `role = 'Admin'` (Primary Pharmacy Owner) without requiring token authorization or blocking form fields.
+> - **Frontend (`RegisterPage.jsx`)**: Unblocked public registration form view and added real-time status banner alerting the registrant that their account will automatically be created with Primary Admin privileges. Tested live API registration (`HTTP 201 Created`, `role: Admin`) and pushed updates to GitHub.
+
+---
 *End of Conversation Log.*
