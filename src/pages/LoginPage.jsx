@@ -12,8 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const executeLogin = async (loginEmail, loginPassword) => {
     setError('');
     setLoading(true);
 
@@ -21,7 +20,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
 
       const data = await res.json();
@@ -36,9 +35,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    executeLogin(email, password);
+  };
+
   const handleQuickDemo = (demoEmail, demoPass) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    executeLogin(demoEmail, demoPass);
   };
 
   return (

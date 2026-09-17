@@ -1,38 +1,39 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../db/database.js';
+import { queryOne, execute } from '../db/database.js';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // POST /api/auth/register
-router.post('/register', (req, res) => {
-  const { name, email, password, role } = req.body;
+router.post('/register', async (req, res) => {
+  const { name, email, password, role } = req.body || {};
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+    const cleanEmail = email.toString().toLowerCase().trim();
+    const existing = await queryOne('SELECT id FROM users WHERE email = ?', [cleanEmail]);
     if (existing) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync(password, salt);
+    const passwordHash = bcrypt.hashSync(password.toString(), salt);
     const userRole = role === 'Admin' ? 'Admin' : 'Pharmacist';
 
-    const result = db.prepare(`
-      INSERT INTO users (name, email, password, role)
-      VALUES (?, ?, ?, ?)
-    `).run(name, email.toLowerCase().trim(), passwordHash, userRole);
+    const result = await execute(
+      `INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`,
+      [name.toString().trim(), cleanEmail, passwordHash, userRole]
+    );
 
     const user = {
-      id: result.lastInsertRowid,
-      name,
-      email: email.toLowerCase().trim(),
+      id: result.lastID,
+      name: name.toString().trim(),
+      email: cleanEmail,
       role: userRole
     };
 
@@ -50,20 +51,22 @@ router.post('/register', (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
-    if (!user) {
+    const cleanEmail = email.toString().toLowerCase().trim();
+    const user = await queryOne('SELECT * FROM users WHERE email = ?', [cleanEmail]);
+    
+    if (!user || !user.password) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const isMatch = bcrypt.compareSync(password, user.password);
+    const isMatch = bcrypt.compareSync(password.toString(), user.password.toString());
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
