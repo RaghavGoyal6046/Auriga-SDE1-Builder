@@ -20,7 +20,7 @@ router.use(authenticate, requireAdmin);
  * - Generates email OTP for verification/activation.
  */
 router.post('/pharmacists', async (req, res) => {
-  const { name, email, phone } = req.body || {};
+  const { name, email, password, phone } = req.body || {};
 
   if (!name || !email) {
     return res.status(400).json({ error: 'Pharmacist name and email are required' });
@@ -47,9 +47,9 @@ router.post('/pharmacists', async (req, res) => {
 
     // Backend strictly forces role = "PHARMACIST"
     const assignedRole = 'PHARMACIST';
-    const temporaryPass = Math.random().toString(36).slice(-8) + 'P@ss1';
+    const userPassword = (password && password.toString().trim()) ? password.toString().trim() : 'pharmacy123';
     const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync(temporaryPass, salt);
+    const passwordHash = bcrypt.hashSync(userPassword, salt);
 
     let pharmacistUser = null;
 
@@ -62,7 +62,7 @@ router.post('/pharmacists', async (req, res) => {
         role: assignedRole,
         phone: cleanPhone,
         isActive: true,
-        isVerified: false,
+        isVerified: true, // Directly verified by Admin
       });
     } catch (dbErr) {
       console.warn('MongoDB User save fallback to SQLite:', dbErr.message);
@@ -76,21 +76,16 @@ router.post('/pharmacists', async (req, res) => {
 
     const userId = pharmacistUser ? pharmacistUser._id : sqliteRes.lastID;
 
-    // Generate & Send Activation OTP to Pharmacist's Email
-    const otpRes = await generateAndSendOtp(cleanEmail, 'EMAIL_VERIFICATION', userId, name.toString().trim());
-
     res.status(201).json({
-      message: `Pharmacist account for ${name} created successfully. Verification OTP code sent to ${cleanEmail}.`,
+      message: `Pharmacist account for ${name} created successfully.`,
       pharmacist: {
         id: userId,
         name: name.toString().trim(),
         email: cleanEmail,
         role: assignedRole,
         isActive: true,
-        isVerified: false,
-        temporaryPassword: temporaryPass,
+        isVerified: true,
       },
-      otp: otpRes.rawOtp, // Returned for dev testing convenience
     });
   } catch (err) {
     console.error('Error creating pharmacist:', err);

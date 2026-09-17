@@ -20,10 +20,9 @@ export default function DashboardPage() {
   const [pharmacistSearch, setPharmacistSearch] = useState('');
   const [totalPharmacists, setTotalPharmacists] = useState(0);
   const [loadingPharmacists, setLoadingPharmacists] = useState(false);
-  const [newPharmacist, setNewPharmacist] = useState({ name: '', email: '', phone: '' });
+  const [newPharmacist, setNewPharmacist] = useState({ name: '', email: '', password: '', phone: '' });
   const [pharmacistError, setPharmacistError] = useState('');
   const [pharmacistSuccess, setPharmacistSuccess] = useState('');
-  const [createdOtpCode, setCreatedOtpCode] = useState(null);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -61,7 +60,6 @@ export default function DashboardPage() {
     setShowPharmacistModal(true);
     setPharmacistError('');
     setPharmacistSuccess('');
-    setCreatedOtpCode(null);
     fetchPharmacistsList();
   };
 
@@ -69,7 +67,6 @@ export default function DashboardPage() {
     e.preventDefault();
     setPharmacistError('');
     setPharmacistSuccess('');
-    setCreatedOtpCode(null);
 
     try {
       const res = await fetch('/api/admin/pharmacists', {
@@ -81,6 +78,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           name: newPharmacist.name,
           email: newPharmacist.email,
+          password: newPharmacist.password || 'pharmacy123',
           phone: newPharmacist.phone,
         }),
       });
@@ -89,10 +87,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to create pharmacist account');
 
       setPharmacistSuccess(data.message);
-      if (data.otp) {
-        setCreatedOtpCode(data.otp);
-      }
-      setNewPharmacist({ name: '', email: '', phone: '' });
+      setNewPharmacist({ name: '', email: '', password: '', phone: '' });
       fetchPharmacistsList(pharmacistSearch);
     } catch (err) {
       setPharmacistError(err.message);
@@ -389,16 +384,9 @@ export default function DashboardPage() {
               )}
 
               {pharmacistSuccess && (
-                <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs space-y-1">
-                  <div className="flex items-center gap-2 font-bold">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                    <span>{pharmacistSuccess}</span>
-                  </div>
-                  {createdOtpCode && (
-                    <p className="text-[11px] text-gray-300">
-                      Dispatched Verification OTP Code: <code className="text-emerald-400 font-mono font-bold text-sm px-1 bg-black/40 rounded">{createdOtpCode}</code>
-                    </p>
-                  )}
+                <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>{pharmacistSuccess}</span>
                 </div>
               )}
 
@@ -408,7 +396,7 @@ export default function DashboardPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. John Doe"
+                    placeholder="e.g. Nikunj"
                     value={newPharmacist.name}
                     onChange={(e) => setNewPharmacist({ ...newPharmacist, name: e.target.value })}
                     className="form-input text-xs py-1.5"
@@ -420,7 +408,7 @@ export default function DashboardPage() {
                   <input
                     type="email"
                     required
-                    placeholder="john@example.com"
+                    placeholder="nik@123.com"
                     value={newPharmacist.email}
                     onChange={(e) => setNewPharmacist({ ...newPharmacist, email: e.target.value })}
                     className="form-input text-xs py-1.5"
@@ -428,12 +416,12 @@ export default function DashboardPage() {
                 </div>
 
                 <div>
-                  <label className="form-label text-[11px]">Phone (Optional)</label>
+                  <label className="form-label text-[11px]">Password (Default: pharmacy123)</label>
                   <input
-                    type="text"
-                    placeholder="+1 555-0192"
-                    value={newPharmacist.phone}
-                    onChange={(e) => setNewPharmacist({ ...newPharmacist, phone: e.target.value })}
+                    type="password"
+                    placeholder="pharmacy123"
+                    value={newPharmacist.password}
+                    onChange={(e) => setNewPharmacist({ ...newPharmacist, password: e.target.value })}
                     className="form-input text-xs py-1.5"
                   />
                 </div>
@@ -442,8 +430,8 @@ export default function DashboardPage() {
                   <span className="text-[11px] text-gray-400 italic">
                     ℹ️ Backend strictly assigns role: <strong>PHARMACIST</strong>
                   </span>
-                  <button type="submit" className="btn-primary text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500">
-                    <UserPlus className="w-3.5 h-3.5" /> Dispatch Activation & OTP
+                  <button type="submit" className="btn-primary text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 font-bold flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5" /> Create Pharmacist Account
                   </button>
                 </div>
               </form>
@@ -478,7 +466,6 @@ export default function DashboardPage() {
                     <th>Pharmacist Name</th>
                     <th>Email Address</th>
                     <th>Role</th>
-                    <th>Email Verification</th>
                     <th>Account Status</th>
                     <th>Action</th>
                   </tr>
@@ -486,7 +473,7 @@ export default function DashboardPage() {
                 <tbody>
                   {loadingPharmacists ? (
                     <tr>
-                      <td colSpan="6" className="text-center py-4 text-emerald-400">Loading pharmacists...</td>
+                      <td colSpan="5" className="text-center py-4 text-emerald-400">Loading pharmacists...</td>
                     </tr>
                   ) : pharmacists.length > 0 ? (
                     pharmacists.map((ph) => (
@@ -495,17 +482,6 @@ export default function DashboardPage() {
                         <td className="text-cyan-300 font-mono">{ph.email}</td>
                         <td>
                           <span className="badge badge-green text-[10px]">PHARMACIST</span>
-                        </td>
-                        <td>
-                          {ph.isVerified !== false ? (
-                            <span className="text-emerald-400 font-bold flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
-                            </span>
-                          ) : (
-                            <span className="text-amber-400 font-semibold flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" /> Pending OTP
-                            </span>
-                          )}
                         </td>
                         <td>
                           {ph.isActive !== false ? (
