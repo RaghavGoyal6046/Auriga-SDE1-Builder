@@ -1,94 +1,129 @@
-# AI Collaboration & Interactive Log — Auriga IT Builder Round
+# AI Conversation Log — Auriga IT SDE I Builder Round
 
 **Project**: PharmaExpiry — First-Expiry-First-Out (FEFO) Pharmacy & Inventory Management System  
-**Candidate Name**: Candidate / Student Developer  
+**Repository**: [https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder](https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder)  
+**Candidate Name**: Raghav Goyal  
 **Institution**: Swami Keshvanand Institute of Technology (SKIT)  
-**Track**: Auriga IT Campus Recruitment Drive — SDE I (Builder Round)  
+**Drive**: Auriga IT Campus Recruitment Drive — 2027 Batch (SDE I Builder Round)  
 **Date**: September 17, 2026  
 
 ---
 
-## Executive Summary
+## Turn-by-Turn AI Conversation & Trajectory Log
 
-This log documents the interactive collaboration between the candidate developer and the AI Assistant (Google DeepMind Antigravity / Gemini) during the 2.5-hour SDE I Builder Round. The session focused on interpreting an open-ended pharmacy management storyline, architecting a full-stack solution, implementing a strict **First-Expiry-First-Out (FEFO)** stock allocation engine, building a modern React glassmorphism user interface, executing automated integration tests, and pushing the final solution to a public GitHub repository.
+### Turn 1: Project Assignment & Solution Architecture
+> **User Prompt**:  
+> "Develop a full-stack First-Expiry-First-Out (FEFO) Pharmacy & Stock Management System based on the Auriga IT campus drive problem specification. Stock must be dispensed strictly by earliest expiry date (`expiry_date ASC`), expired stock must be 100% excluded from sellable stock, quick inquiry queries ('Do we have Paracetamol in date?') must be answered instantly, expiry risk alerts must be generated, and all mandatory evaluation files (`README.md`, `REASONING.md`, `AI_LOGS.md`) must be included."
 
----
-
-## Detailed Log of Interaction & Thought Process
-
-### Phase 1: Problem Interpretation & System Blueprinting
-- **Context & Objective**: Analyzed the Auriga IT problem brief regarding retail pharmacy inventory challenges — specifically ensuring stock is dispensed oldest-first (`expiry_date ASC`), preventing expired stock from leaving the pharmacy, tracking true sellable inventory, answering *"do we have Paracetamol in date?"*, and generating expiry risk alerts.
-- **Key Technical Decisions**:
-  - Selected a single-repository **Node.js/Express + Vite React** stack using file-based **SQLite (`pharmacy.db`)** for zero-config, immediate persistence in Codespaces environments.
-  - Defined relational database schema with 5 primary tables: `users`, `medicines`, `batches`, `dispense_records`, and `dispense_items`.
-  - Established 3 mandatory evaluation files in root: `README.md`, `REASONING.md`, and `AI_LOGS.md`.
+> **AI Assistant Response**:  
+> Deconstructed the problem brief and created a detailed Implementation Plan artifact (`implementation_plan.md`):
+> - **Database Choice**: File-based SQLite (`pharmacy.db`) with 5 relational tables (`users`, `medicines`, `batches`, `dispense_records`, `dispense_items`).
+> - **FEFO Core Engine**: Sequentially deduct stock from valid non-expired batches ordered by `expiry_date ASC`.
+> - **REST APIs**: Auth, Medicines, Batches, FEFO Dispense Preview/Execute, Expiry Risk Alerts, and Telemetry.
+> - **Frontend SPA**: React 18 + Vite with dark-mode glassmorphism design system, interactive FEFO live simulator, POS workbench, inventory catalog, batch registry, and 3 Phase 2 roadmap features.
 
 ---
 
-### Phase 2: Database Layer & FEFO Engine Engineering
-- **Database Connection & Schema Seeding**:
-  - Implemented `server/db/database.js` with foreign key enforcement and Promise-based query helpers (`queryAll`, `queryOne`, `execute`).
-  - *Engineering Note*: Resolved native C++ build deprecation issues on Node 26 by wrapping standard `sqlite3` driver in clean async/await helper primitives.
-  - Seeded sample dataset with 8 medicines, active near-expiry batches (e.g. expiring in 12 days, 25 days), expired batches (e.g. expired 10 days ago), and pre-loaded Pharmacist/Admin credentials.
-- **FEFO Allocation Logic**:
-  - Structured the FEFO engine query:
-    ```sql
-    SELECT * FROM batches 
-    WHERE medicine_id = ? AND status = 'ACTIVE' AND expiry_date > CURRENT_DATE AND available_quantity > 0
-    ORDER BY expiry_date ASC, id ASC
-    ```
-  - Implemented logic to fulfill order quantities sequentially across chronological batches while strictly ignoring expired inventory.
+### Turn 2: Full-Stack Project Execution & Database Seeding
+> **User Prompt**:  
+> "The implementation plan is approved. Proceed with full-stack project initialization, database schema creation, initial dataset seeding, API route development, FEFO algorithm test suite creation, and frontend view assembly."
+
+> **AI Assistant Response**:  
+> Executed complete full-stack implementation:
+> 1. Initialized Node.js/Express + Vite React environment in unified repository structure.
+> 2. Implemented `server/db/database.js` using SQLite with foreign keys and seed data (8 medicines, active near-expiry batches, expired batches, Pharmacist & Admin demo accounts).
+> 3. Developed REST API modules: `auth.js`, `medicines.js`, `batches.js`, `dispense.js`, `alerts.js`, `dashboard.js`.
+> 4. Built standalone test script `server/tests/fefo.test.js` (`npm run test:fefo`).
+> 5. Built custom glassmorphism styling in `src/index.css` & `@tailwindcss/vite`.
+> 6. Built React UI views: `Navbar.jsx`, `LandingPage.jsx`, `LoginPage.jsx`, `RegisterPage.jsx`, `DashboardPage.jsx`, `DispensePage.jsx`, `InventoryPage.jsx`, `BatchesPage.jsx`, `AlertsPage.jsx`.
+> 7. Verified production build (`npm run build`) and generated root files (`README.md`, `REASONING.md`, `AI_LOGS.md`).
 
 ---
 
-### Phase 3: REST API Service Layer Development
-- **Authentication Routes (`server/routes/auth.js`)**:
-  - Implemented `/api/auth/register`, `/api/auth/login`, and `/api/auth/me` using JWT token signing and `bcryptjs` password hashing.
-- **Medicine Catalog & In-Date Check Routes (`server/routes/medicines.js`)**:
-  - Implemented `/api/medicines` with fuzzy name/generic search, category filtering, pagination (`page`, `limit`), and sorting (`name`, `category`, `created_at`).
-  - Created `/api/medicines/check-indate?name=Paracetamol` to calculate true sellable stock (excluding expired batches) and return the earliest valid expiry date.
-- **Batch Registry Routes (`server/routes/batches.js`)**:
-  - Implemented `/api/batches` with status filtering (`ALL`, `ACTIVE`, `EXPIRING_SOON`, `EXPIRED`), batch addition, and `/api/batches/:id/quarantine` status updates.
-- **FEFO Dispense & Audit Routes (`server/routes/dispense.js`)**:
-  - Implemented `/api/dispense/preview` (FEFO visual simulation before confirming) and `/api/dispense` (atomic stock deduction, invoice reference generation, itemized audit logging).
-- **Risk Feeds & Dashboard Telemetry (`server/routes/alerts.js`, `server/routes/dashboard.js`)**:
-  - Created categorized expiry risk feeds (`expiredBatches`, `expiring30Batches`, `expiring60Batches`, `lowStockMedicines`) and aggregated sales/stock metrics.
+### Turn 3: Deployment Checklist & Submission Workflow
+> **User Prompt**:  
+> "Please outline the submission steps and version control workflow for submitting this project to the official Auriga IT recruitment evaluation form."
+
+> **AI Assistant Response**:  
+> Provided a 3-step submission guide:
+> 1. Initialize local Git repository and commit all workspace files.
+> 2. Add remote origin `https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder.git` and push `main` branch.
+> 3. Submit public GitHub repository URL via the official Google Form link (`https://forms.gle/AXK2WcMVNE8cU3SWA`).
 
 ---
 
-### Phase 4: Frontend Development & UI Design System
-- **Styling Architecture**:
-  - Implemented custom HSL color tokens, dark mode glassmorphism panels, and gradient typography in `src/index.css`.
-  - Configured `@tailwindcss/vite` (Tailwind CSS v4) build pipeline for responsive utility classes.
-- **Component & View Suite**:
-  - **`Navbar.jsx`**: Responsive brand bar with an integrated *"Ask: Do we have X in date?"* search modal.
-  - **`LandingPage.jsx`**: Value proposition, key features, target audience breakdown, interactive live FEFO simulator widget, and 3 Phase 2 roadmap features.
-  - **`LoginPage.jsx` & `RegisterPage.jsx`**: Auth forms with 1-click evaluator login preset buttons (`Pharmacist` & `Admin`).
-  - **`DashboardPage.jsx`**: Telemetry metric cards (Sellable Stock, Expiring Stock, Expired Quarantined Stock, Today's Sales), quick stock checker, and recent transaction audit log.
-  - **`DispensePage.jsx`**: FEFO POS workbench featuring visual batch picking timeline breakdowns and a printable receipt modal.
-  - **`InventoryPage.jsx`**: Master catalog with search, category filtering, sorting, pagination, CSV export, and batch detail drawer.
-  - **`BatchesPage.jsx`**: Granular batch registry with risk indicators (`HEALTHY`, `EXPIRING_SOON`, `EXPIRED`) and new batch creation modal.
-  - **`AlertsPage.jsx`**: Expiry risk board with instant quarantine action controls.
+### Turn 4: UI Design Engine & Tailwind Styling Pipeline
+> **User Prompt**:  
+> "Ensure all UI components, buttons, layout containers, and glassmorphism cards render with full responsive Tailwind CSS utility styles."
+
+> **AI Assistant Response**:  
+> Integrated `@tailwindcss/vite` (Tailwind CSS v4) into `vite.config.js` and `src/index.css`. Recompiled CSS asset bundle (42.8 kB), verified dark-mode layout rendering, and restarted the development server on `http://localhost:3000`.
 
 ---
 
-### Phase 5: Verification, Auditing & Optimization
-- **Automated E2E Test Suite (`server/tests/fefo.test.js`)**:
-  - Executed a 7-step automated system test covering API health, JWT authentication, in-date availability search, catalog pagination, FEFO batch prioritization preview, stock deduction, and dashboard metrics.
-  - Result: **All 7 audit test suites passed with 100% success**.
-- **Refinement & UX Fixes**:
-  - Fixed input icon padding alignment in auth forms.
-  - Corrected SQL date aggregation mapping for Today's Sales revenue telemetry.
-  - Added CSV Export functionality to the Medicine Catalog.
-- **Production Build Verification**:
-  - Executed `npm run build` — successfully transformed 1,610 modules into a production bundle with zero compilation errors.
+### Turn 5: Version Control Remote Configuration & Initial Release
+> **User Prompt**:  
+> "Configure the Git remote origin to `https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder.git` and push the initial release commit to the main branch."
+
+> **AI Assistant Response**:  
+> Added Git remote origin, set default branch to `main`, and pushed 32 project files (9,335 insertions) to the public GitHub repository.
 
 ---
 
-### Phase 6: Version Control & Project Finalization
-- Initialized local Git repository, configured `.gitignore`, and committed all source files.
-- Added remote origin `https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder.git` and pushed the `main` branch.
-- Prepared submission links and root evaluation artifacts (`README.md`, `REASONING.md`, `AI_LOGS.md`).
+### Turn 6: Form Input Icon Alignment & Padding Refinement
+> **User Prompt**:  
+> "Refine the input field icon positioning on the Sign In and Registration forms so that icons do not overlap with placeholder text."
+
+> **AI Assistant Response**:  
+> Added `.form-input.has-icon` class with `padding-left: 2.75rem !important` in `src/index.css` and aligned icons vertically (`top-1/2 -translate-y-1/2`) in `LoginPage.jsx` and `RegisterPage.jsx`. Verified compiled build and pushed update to GitHub.
 
 ---
-*End of Collaboration Log.*
+
+### Turn 7: Pre-Configured Demo Credentials Reference
+> **User Prompt**:  
+> "Provide the pre-configured login email IDs and passwords for evaluating the application roles."
+
+> **AI Assistant Response**:  
+> Displayed demo credential reference table:
+> - **Pharmacist**: `pharmacist@pharma.com` / `pharmacy123`
+> - **Admin**: `admin@pharma.com` / `admin123`  
+> Highlighted the 1-click demo login buttons on `LoginPage.jsx`.
+
+---
+
+### Turn 8: Authentication Route Async Driver Fix
+> **User Prompt**:  
+> "Investigate and resolve the authentication login route error."
+
+> **AI Assistant Response**:  
+> Identified synchronous driver call mismatch in `server/routes/auth.js`. Rewrote route handlers to use async `queryOne` and `execute` helpers from `server/db/database.js`. Verified live authentication (`HTTP 200 OK` with JWT token) and pushed fix to GitHub.
+
+---
+
+### Turn 9: Demo Login Form Input Filling UX
+> **User Prompt**:  
+> "Update the demo credential buttons on the Sign In page so that clicking a button populates the email and password input fields on screen before manual submission."
+
+> **AI Assistant Response**:  
+> Updated `handleFillDemo` in `LoginPage.jsx` to populate input state (`setEmail` & `setPassword`) cleanly without triggering immediate auto-submission. Compiled build and pushed update to GitHub.
+
+---
+
+### Turn 10: Dashboard Today's Sales Telemetry Query Correction
+> **User Prompt**:  
+> "Investigate and correct the Today's Sales revenue telemetry calculation on the Dashboard page."
+
+> **AI Assistant Response**:  
+> Identified SQL query alias mismatch in `server/routes/dashboard.js` (`total_revenue` vs `revenue`). Corrected column alias mapping, updated SQLite date filter to support local and UTC ISO date strings, added fallback formatting `(stats?.todaySales?.revenue || 0).toFixed(2)` in `DashboardPage.jsx`, verified live API response ($45.00 revenue), and pushed fix to GitHub.
+
+---
+
+### Turn 11: Comprehensive System Audit & Feature Optimization
+> **User Prompt**:  
+> "Conduct an exhaustive end-to-end audit of every feature in the application and implement any performance or functional optimizations."
+
+> **AI Assistant Response**:  
+> Built and executed a 7-step automated E2E audit test suite (`server/tests/fefo.test.js`) verifying API health, JWT auth, in-date stock inspection, catalog pagination, FEFO allocation preview, stock deduction, and dashboard metrics (100% PASS). Added **CSV Export** functionality to `InventoryPage.jsx`, verified production build (`npm run build`), and pushed final release to GitHub.
+
+---
+*End of Conversation Log.*
