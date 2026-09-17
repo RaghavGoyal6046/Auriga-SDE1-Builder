@@ -1,11 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { initDatabase } from './db/database.js';
+import { connectMongoDB } from './db/mongodb.js';
 
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import medicinesRoutes from './routes/medicines.js';
 import batchesRoutes from './routes/batches.js';
 import dispenseRoutes from './routes/dispense.js';
@@ -23,11 +26,13 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Middlewares
+app.use(helmet({ contentSecurityPolicy: false })); // Disable default CSP so Vite dev inline scripts and fonts load smoothly
 app.use(cors());
 app.use(express.json());
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/medicines', medicinesRoutes);
 app.use('/api/batches', batchesRoutes);
 app.use('/api/dispense', dispenseRoutes);
@@ -65,6 +70,7 @@ app.get('*', (req, res, next) => {
 async function startServer() {
   try {
     await initDatabase();
+    await connectMongoDB();
     app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`🚀 PharmaExpiry Backend API running on port ${PORT}`);
@@ -78,3 +84,4 @@ async function startServer() {
 }
 
 startServer();
+

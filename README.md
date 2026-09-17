@@ -1,6 +1,19 @@
-# PharmaExpiry — FEFO Pharmacy & Stock Management System
+# PharmaExpiry — FEFO Pharmacy & Stock Management System with Complete Auth & Authorization
 
-PharmaExpiry is an intelligent, full-stack web application built for retail and hospital pharmacies to strictly enforce **First-Expiry-First-Out (FEFO)** inventory management. It guarantees that medicines with the earliest expiry dates are dispensed first, prevents expired stock from being dispensed, calculates real-time sellable inventory, and provides an instant "In-Date Stock Inspector".
+PharmaExpiry is an intelligent, production-grade full-stack web application built for retail and hospital pharmacies to strictly enforce **First-Expiry-First-Out (FEFO)** inventory management while maintaining role-based authorization for **ADMIN** and **PHARMACIST** users.
+
+---
+
+## 🛠️ Technology Stack & Architecture
+
+- **Frontend**: React, React Router, TailwindCSS (v4), Lucide Icons
+- **Backend**: Node.js & Express.js
+- **Database**: MongoDB (Mongoose Schema) with dual SQLite3 fallback for local dev
+- **Authentication**: Bearer JWT (JSON Web Tokens)
+- **Password Hashing**: bcryptjs (10 salt rounds)
+- **Google Authentication**: Google OAuth 2.0 / OpenID Connect (`google-auth-library`)
+- **Email Verification**: 6-digit numeric OTP via Nodemailer SMTP Service
+- **Security**: Helmet headers, Rate limiting (`express-rate-limit`), CORS, Input sanitization
 
 ---
 
@@ -9,143 +22,130 @@ PharmaExpiry is an intelligent, full-stack web application built for retail and 
 ### Prerequisites
 - **Node.js**: v18.x or higher (tested on Node 20 & Node 26)
 - **npm**: v9.x or higher
+- **MongoDB**: Local MongoDB daemon or MongoDB Atlas connection URI
 
-### 1. Installation
-Clone the repository and install all dependencies:
+### 1. Installation & Environment Configuration
+Clone the repository, install dependencies, and create your `.env` file:
 ```bash
 git clone <repository-url>
 cd Auriga
 npm install
+cp .env.example .env
 ```
 
-### 2. Run FEFO Engine Test Suite
-Run the automated FEFO algorithm validation test suite to verify database seeding, batch sorting by earliest expiry, and expired stock exclusion:
+### 2. Configure Environment Variables (`.env`)
+```env
+PORT=5001
+MONGODB_URI=mongodb://127.0.0.1:27017/pharmaexpiry
+JWT_SECRET=super_secret_pharmacy_jwt_key_change_in_production_2026
+JWT_EXPIRES_IN=24h
+
+# SMTP Email Service Credentials for OTP Verification
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=pharmacy.alerts.service@gmail.com
+SMTP_PASSWORD=your_app_specific_password_here
+SMTP_FROM="PharmaExpiry Auth System <pharmacy.alerts.service@gmail.com>"
+
+# Google OAuth 2.0 / OpenID Connect Credentials
+GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_CALLBACK_URL=http://localhost:5001/api/auth/google/callback
+```
+
+### 3. Run FEFO & Authentication Test Suite
+Validate the complete FEFO algorithm and API endpoints:
 ```bash
 npm run test:fefo
 ```
 
-### 3. Run Application in Development Mode
-Launch both the Express API server (port 5000) and Vite React frontend (port 3000) concurrently:
+### 4. Launch Development Environment
+Launch both the Express API server (port 5001) and Vite React frontend (port 3000) concurrently:
 ```bash
 npm run dev
 ```
 Open **`http://localhost:3000`** in your browser.
 
-### 4. Build for Production
-To create an optimized production build:
-```bash
-npm run build
-npm run server
-```
+---
+
+## 🔐 User Roles & First-User Bootstrapping Architecture
+
+### 1. Backend-Enforced Roles
+There are only two strictly controlled backend roles:
+- `ADMIN`: Pharmacy Owner / System Administrator. Can manage pharmacists, activate/deactivate accounts, and inspect full telemetry.
+- `PHARMACIST`: Staff Pharmacist. Can view inventory, add batches, inspect stock, and dispense medicines via FEFO POS.
+*The backend never trusts a role sent from the React frontend.*
+
+### 2. First-User Bootstrapping
+1. When **ZERO users** exist in MongoDB:
+   - Public registration is allowed (`POST /api/auth/register`).
+   - The first registered user automatically receives `role: "ADMIN"`.
+   - The registration form hides role selection.
+2. Once an `ADMIN` exists:
+   - Public registration is automatically disabled.
+   - Any attempt to register publicly returns 403 Forbidden: `"Public registration is disabled. Please contact the administrator."`
+   - Only an authenticated `ADMIN` can create new pharmacist accounts via `POST /api/admin/pharmacists`.
 
 ---
 
-## 🔑 Pre-Configured Demo Credentials
-
-For instant evaluator testing, use the following pre-loaded accounts (or click the **Quick Evaluator Login** buttons on the Sign In page):
-
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **Pharmacist** | `pharmacist@pharma.com` | `pharmacy123` |
-| **Admin** | `admin@pharma.com` | `admin123` |
-
----
-
-## 📡 Complete REST API Catalog
-
-All API endpoints are hosted at `/api/*`. Below is the complete catalog of endpoints implemented in the system:
+## 🔑 Authentication & Authorization Endpoints Catalog
 
 ### 1. Authentication APIs (`/api/auth`)
-| Method | Endpoint | Description | Auth Required |
+| Method | Endpoint | Description | Public / Auth |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Register a new user (`name`, `email`, `password`, `role`) | No |
-| `POST` | `/api/auth/login` | Authenticate user and receive Bearer JWT token | No |
-| `GET` | `/api/auth/me` | Fetch currently authenticated user profile | Yes |
+| `GET` | `/api/auth/setup-status` | Check if 0 users exist and initial Admin setup is required | Public |
+| `POST` | `/api/auth/register` | Register first user as ADMIN (disabled after 1st user) | Public (First user only) |
+| `POST` | `/api/auth/login` | Authenticate with email/password and obtain Bearer JWT | Public |
+| `GET` | `/api/auth/me` | Fetch authenticated user profile (excludes passwordHash & OTP) | Bearer Token |
+| `POST` | `/api/auth/request-otp` | Generate & send 6-digit numeric email OTP code | Public (Rate Limited) |
+| `POST` | `/api/auth/verify-otp` | Verify OTP code and activate pharmacist account / reset password | Public |
+| `POST` | `/api/auth/google` | Sign in with Google OAuth ID Token (Links Google account or bootstraps 1st Admin) | Public |
 
-### 2. Medicine Catalog APIs (`/api/medicines`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/medicines` | Fetch medicines list with search, category filter, pagination (`page`, `limit`), and sorting (`name`, `category`, `created_at`) | No |
-| `GET` | `/api/medicines/check-indate?name=Paracetamol` | Quick inquiry: *"Do we have X in date?"* Returns sellable stock quantity, earliest expiry date, and priority batch | No |
-| `GET` | `/api/medicines/:id` | Get medicine details along with all active and expired batches | No |
-| `POST` | `/api/medicines` | Add a new medicine to catalog (`name`, `generic_name`, `category`, `unit`, `reorder_level`) | Yes |
+### 2. Admin Pharmacist Management APIs (`/api/admin/pharmacists`)
+*All `/api/admin/*` endpoints require Bearer JWT token with `ADMIN` role.*
 
-### 3. Batch Registry APIs (`/api/batches`)
-| Method | Endpoint | Description | Auth Required |
+| Method | Endpoint | Description | Access |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/batches` | List batches with status filter (`ALL`, `ACTIVE`, `EXPIRING_SOON`, `EXPIRED`), search, pagination, and sorting (`expiry_date`, `available_quantity`) | No |
-| `POST` | `/api/batches` | Add a new batch entry (`medicine_id`, `batch_number`, `initial_quantity`, `mfg_date`, `expiry_date`, `unit_price`, `shelf_location`) | Yes |
-| `PUT` | `/api/batches/:id/quarantine` | Move batch to quarantine status and shelf | Yes |
-
-### 4. FEFO Dispense APIs (`/api/dispense`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/dispense/preview` | **FEFO Engine Simulation**: Returns visual batch breakdown plan sorted strictly by earliest expiry date before confirming sale | Yes |
-| `POST` | `/api/dispense` | **Execute Dispense**: Atomically deducts stock in FEFO order, creates invoice record, and returns printable receipt | Yes |
-| `GET` | `/api/dispense/history` | Audit log of past sales with pagination, search, patient name, and batch breakdown | No |
-
-### 5. Risk & Telemetry APIs (`/api/alerts`, `/api/dashboard`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/alerts/expiring` | Get categorized risk feeds: `expiredBatches`, `expiring30Batches` (&lt; 30 days), `expiring60Batches`, and `lowStockMedicines` | No |
-| `GET` | `/api/dashboard/stats` | High-level telemetry: total sellable stock value, expired quarantined stock, today's sales, and recent sales | No |
-
-### 6. Competition Evaluation Twists (`/clock`, `/api/batches/import-messy`, `/outbox`)
-| Method | Endpoint | Twist Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/clock` or `/api/clock` | **Level 1 — T2 (Automation)**: Daily job that flags batches expiring within 7 days, quarantines expired ones, and returns `{ date, quarantined_count, expiring_soon_count, healthy_count }` | No |
-| `POST` | `/api/batches/import-messy` or `/api/batches/import` | **Level 2 — T4 (Messy Data)**: Imports messy batch lists (nulls, `'10 units'`, `dd/mm/yyyy` vs ISO dates, duplicate rows) into clean stock with a `{ imported, deduped, rejected }` report | No |
-| `GET` / `POST` | `/outbox` or `/api/outbox` | **Level 3 — T1 (Integrate)**: Outbox Notification Service for low-stock re-order alerts when sellable in-date stock drops below threshold | No |
+| `POST` | `/api/admin/pharmacists` | Admin creates pharmacist account (Backend forces `role = "PHARMACIST"`) | Admin Only |
+| `GET` | `/api/admin/pharmacists` | List all pharmacists with search & pagination (`search`, `page`, `limit`) | Admin Only |
+| `GET` | `/api/admin/pharmacists/:id` | Get details for specific pharmacist | Admin Only |
+| `PATCH` | `/api/admin/pharmacists/:id` | Update pharmacist profile details (`name`, `email`, `phone`) | Admin Only |
+| `PATCH` | `/api/admin/pharmacists/:id/status` | Activate/Deactivate pharmacist account (`isActive: boolean`) | Admin Only |
 
 ---
 
-## 🛠️ Debugging & Troubleshooting
+## 📧 Email Service & OTP Verification Flow
 
-- **Database Inspection**: The SQLite database file is located at `pharmacy.db` in the project root. You can inspect or reset it at any time by running `npm run test:fefo`.
-- **Backend Logs**: Backend server logs all incoming API calls and DB queries to `stdout`.
-- **Frontend State**: Inspect React state using standard React Developer Tools.
+1. When an Admin creates a pharmacist account via `POST /api/admin/pharmacists`, the system:
+   - Sets `isVerified = false` initially.
+   - Generates a secure random 6-digit numeric OTP.
+   - Hashes the OTP using bcrypt before storing it in MongoDB `otps` collection with a 5-minute expiration timestamp.
+   - Dispatches a formatted HTML email via Nodemailer SMTP containing the pharmacy name, OTP code, expiration time, and security notice.
+2. Pharmacist verifies email via `POST /api/auth/verify-otp` with their email, OTP code, and chosen password to activate account (`isVerified = true`).
 
 ---
 
-## 🗂️ Project Structure
+## 🌐 Google OAuth 2.0 / OpenID Connect Setup
 
-```
-Auriga/
-├── package.json               # Dependency definitions and scripts
-├── vite.config.js             # Vite configuration with API proxy
-├── index.html                 # Main HTML entry with Google Fonts
-├── pharmacy.db                # SQLite file database
-├── README.md                  # Project overview, setup, and REST API catalog
-├── REASONING.md               # Architectural thought process & FEFO analysis
-├── AI_LOGS.md                 # Evaluation AI transcript logs
-├── server/                    # Node.js & Express REST Backend
-│   ├── index.js               # Server entry point
-│   ├── db/database.js         # SQLite database connection & initial seeder
-│   ├── middleware/auth.js     # JWT authentication middleware
-│   ├── routes/                # REST API Route Modules
-│   │   ├── auth.js            # User authentication routes
-│   │   ├── medicines.js       # Medicine catalog & quick check routes
-│   │   ├── batches.js         # Batch management routes
-│   │   ├── dispense.js        # FEFO engine & invoice routes
-│   │   ├── alerts.js          # Expiry risk alerts routes
-│   │   └── dashboard.js       # Telemetry metrics routes
-│   └── tests/
-│       └── fefo.test.js       # Standalone FEFO algorithm test suite
-└── src/                       # React Frontend SPA
-    ├── index.css              # Custom HSL design tokens & glassmorphic styles
-    ├── main.jsx               # React entry point
-    ├── App.jsx                # Router & layout provider
-    ├── context/
-    │   └── AuthContext.jsx    # Authentication state context
-    ├── components/
-    │   └── Navbar.jsx         # Responsive navigation & quick stock checker
-    └── pages/                 # Full-Stack Application Views
-        ├── LandingPage.jsx    # Interactive product showcase & FEFO demo
-        ├── LoginPage.jsx      # Login page with 1-click evaluator presets
-        ├── RegisterPage.jsx   # User registration page
-        ├── DashboardPage.jsx  # Inventory telemetry & sales metrics
-        ├── DispensePage.jsx   # FEFO POS workbench & printable receipt modal
-        ├── InventoryPage.jsx  # Medicine catalog with search & pagination
-        ├── BatchesPage.jsx    # Granular batch registry & risk indicators
-        └── AlertsPage.jsx     # Expiry risk board & quarantine manager
-```
+1. Obtain Google OAuth Client Credentials from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALLBACK_URL` in `.env`.
+3. Behavior:
+   - If user exists with matching verified email: Google account is safely linked (`googleId`), preserving existing role (`ADMIN` or `PHARMACIST`).
+   - If 0 users exist: First Google sign-in automatically creates the primary `ADMIN` account.
+   - If users exist and Google email is not pre-invited by Admin: Login is rejected with `"Your Google account has not been invited by the pharmacy administrator."`
+
+---
+
+## 🧪 FEFO Business Logic & Competition Evaluation Twists
+
+- **Expired Stock Safeguard**: Expired batches are automatically moved to `EXPIRED` status and excluded from all sales calculations.
+- **FEFO Allocation**: Items sold are strictly allocated from batches with the **earliest expiry date first**.
+- **`/clock` Endpoint**: Daily job flags batches expiring within 7 days and quarantines expired stock.
+- **`/api/batches/import-messy` Endpoint**: Cleans, parses, and deduplicates messy batch datasets into valid inventory.
+- **`/outbox` Endpoint**: Low-stock outbox notification service triggered when sellable in-date inventory drops below reorder levels.
+
+---
+
+## 📄 License & Compatibility
+
+Compatible with GitHub Codespaces, Linux, macOS, and Windows environments.

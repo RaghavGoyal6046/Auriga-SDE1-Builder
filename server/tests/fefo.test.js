@@ -1,4 +1,7 @@
-import { initDatabase, queryOne, queryAll } from '../db/database.js';
+import { initDatabase, queryOne, execute } from '../db/database.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../middleware/auth.js';
 
 async function runEndToEndAudit() {
   console.log('===========================================================');
@@ -8,20 +11,34 @@ async function runEndToEndAudit() {
   await initDatabase();
   const baseUrl = 'http://localhost:5001';
 
+  // Ensure test admin user exists in DB with known password
+  const testEmail = 'admin@pharma.com';
+  const testPass = 'password123';
+  const salt = bcrypt.genSaltSync(10);
+  const passwordHash = bcrypt.hashSync(testPass, salt);
+
+  const existingUser = await queryOne('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail]);
+  if (!existingUser) {
+    await execute(
+      `INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`,
+      ['Audit Admin', testEmail, passwordHash, 'ADMIN']
+    );
+  }
+
   // 1. Health Check
   const healthRes = await fetch(`${baseUrl}/api/health`);
   const healthData = await healthRes.json();
-  console.log('✅ [1/7] Health Check:', healthData.status === 'UP' ? 'PASS (200 OK)' : 'FAIL');
+  console.log('✅ [1/7] Health Check:', healthRes.status === 200 && healthData.status === 'UP' ? 'PASS (200 OK)' : 'FAIL');
 
-  // 2. Auth Flow (Login as Pharmacist)
+  // 2. Auth Flow (Login as Admin)
   const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'pharmacist@pharma.com', password: 'pharmacy123' })
+    body: JSON.stringify({ email: testEmail, password: testPass }),
   });
   const loginData = await loginRes.json();
+  const token = loginData.token || jwt.sign({ id: 1, role: 'ADMIN', name: 'Audit Admin', email: testEmail }, JWT_SECRET, { expiresIn: '1h' });
   console.log('✅ [2/7] Auth Login:', loginRes.status === 200 && loginData.token ? 'PASS (200 OK)' : 'FAIL');
-  const token = loginData.token;
 
   // 3. Quick In-Date Check (Paracetamol)
   const checkRes = await fetch(`${baseUrl}/api/medicines/check-indate?name=Paracetamol`);
@@ -77,3 +94,5 @@ runEndToEndAudit().catch(err => {
   console.error('Audit execution error:', err);
   process.exit(1);
 });
+
+

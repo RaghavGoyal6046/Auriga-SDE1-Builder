@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Package, ShieldAlert, AlertTriangle, TrendingUp, ShoppingCart, PlusCircle, Search, CheckCircle, XCircle, ArrowUpRight, DollarSign, Clock, Users, UserPlus, Shield, Trash2 } from 'lucide-react';
+import { Package, ShieldAlert, AlertTriangle, TrendingUp, ShoppingCart, PlusCircle, Search, CheckCircle, XCircle, ArrowUpRight, Clock, Users, UserPlus, Shield, ToggleLeft, ToggleRight, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, token } = useAuth();
@@ -14,13 +14,16 @@ export default function DashboardPage() {
   const [checkResult, setCheckResult] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
 
-  // Staff Management Modal State (Admin only)
-  const [showStaffModal, setShowStaffModal] = useState(false);
-  const [staffList, setStaffList] = useState([]);
-  const [loadingStaff, setLoadingStaff] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'Pharmacist' });
-  const [staffError, setStaffError] = useState('');
-  const [staffSuccess, setStaffSuccess] = useState('');
+  // Pharmacist Management Modal State (Admin only)
+  const [showPharmacistModal, setShowPharmacistModal] = useState(false);
+  const [pharmacists, setPharmacists] = useState([]);
+  const [pharmacistSearch, setPharmacistSearch] = useState('');
+  const [totalPharmacists, setTotalPharmacists] = useState(0);
+  const [loadingPharmacists, setLoadingPharmacists] = useState(false);
+  const [newPharmacist, setNewPharmacist] = useState({ name: '', email: '', phone: '' });
+  const [pharmacistError, setPharmacistError] = useState('');
+  const [pharmacistSuccess, setPharmacistSuccess] = useState('');
+  const [createdOtpCode, setCreatedOtpCode] = useState(null);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -38,73 +41,81 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchStaffList = async () => {
-    setLoadingStaff(true);
+  const fetchPharmacistsList = async (search = '') => {
+    setLoadingPharmacists(true);
     try {
-      const res = await fetch('/api/auth/users', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`/api/admin/pharmacists?search=${encodeURIComponent(search)}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      setStaffList(data.users || []);
+      setPharmacists(data.pharmacists || []);
+      setTotalPharmacists(data.pagination?.totalItems || data.pharmacists?.length || 0);
     } catch (err) {
-      console.error('Failed to fetch staff list:', err);
+      console.error('Failed to fetch pharmacists list:', err);
     } finally {
-      setLoadingStaff(false);
+      setLoadingPharmacists(false);
     }
   };
 
-  const handleOpenStaffModal = () => {
-    setShowStaffModal(true);
-    fetchStaffList();
+  const handleOpenPharmacistModal = () => {
+    setShowPharmacistModal(true);
+    setPharmacistError('');
+    setPharmacistSuccess('');
+    setCreatedOtpCode(null);
+    fetchPharmacistsList();
   };
 
-  const handleAddStaffMember = async (e) => {
+  const handleAddPharmacist = async (e) => {
     e.preventDefault();
-    setStaffError('');
-    setStaffSuccess('');
+    setPharmacistError('');
+    setPharmacistSuccess('');
+    setCreatedOtpCode(null);
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch('/api/admin/pharmacists', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newStaff)
+        body: JSON.stringify({
+          name: newPharmacist.name,
+          email: newPharmacist.email,
+          phone: newPharmacist.phone,
+        }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to add staff member');
+      if (!res.ok) throw new Error(data.error || 'Failed to create pharmacist account');
 
-      setStaffSuccess(`Success! ${data.user.role} account created for ${data.user.name}.`);
-      setNewStaff({ name: '', email: '', password: '', role: 'Pharmacist' });
-      fetchStaffList();
+      setPharmacistSuccess(data.message);
+      if (data.otp) {
+        setCreatedOtpCode(data.otp);
+      }
+      setNewPharmacist({ name: '', email: '', phone: '' });
+      fetchPharmacistsList(pharmacistSearch);
     } catch (err) {
-      setStaffError(err.message);
+      setPharmacistError(err.message);
     }
   };
 
-  const handleDeleteStaff = async (staffId, staffName) => {
-    if (!window.confirm(`Are you sure you want to delete staff account for ${staffName}?`)) {
-      return;
-    }
-
-    setStaffError('');
-    setStaffSuccess('');
-
+  const handleToggleStatus = async (pharmacistId, currentStatus, pharmacistName) => {
     try {
-      const res = await fetch(`/api/auth/users/${staffId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`/api/admin/pharmacists/${pharmacistId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete staff account');
+      if (!res.ok) throw new Error(data.error || 'Failed to update status');
 
-      setStaffSuccess(data.message);
-      fetchStaffList();
+      fetchPharmacistsList(pharmacistSearch);
     } catch (err) {
-      setStaffError(err.message);
+      alert(err.message);
     }
   };
 
@@ -135,30 +146,37 @@ export default function DashboardPage() {
     );
   }
 
-  const isAdmin = user?.role === 'Admin';
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'Admin';
 
   return (
     <div className="min-h-screen bg-[#0b0f19] p-4 lg:p-8 max-w-7xl mx-auto space-y-8 pb-16">
       
-      {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">PharmaCompanion Telemetry</h1>
-            <span className={`badge ${isAdmin ? 'badge-yellow' : 'badge-green'} text-[11px]`}>
-              {isAdmin ? 'CHIEF PHARMACIST / OWNER' : 'PHARMACIST WORKBENCH'}
-            </span>
+      {/* Top Header & User Profile Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-5 border-emerald-500/20">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-extrabold text-lg">
+            {user?.name?.charAt(0) || 'U'}
           </div>
-          <p className="text-xs text-emerald-400/90 font-medium mt-1">Real-Time FEFO Inventory & Clinical Dispensing Analytics</p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white">{user?.name}</h1>
+              <span className={`badge ${isAdmin ? 'badge-yellow' : 'badge-green'} text-[11px]`}>
+                {isAdmin ? 'PRIMARY ADMIN / PHARMACY OWNER' : 'LICENSED PHARMACIST'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Logged in as <code className="text-emerald-400 font-mono">{user?.email}</code> • Account Status: <span className="text-emerald-400 font-semibold">Active & Verified</span>
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {isAdmin && (
             <button
-              onClick={handleOpenStaffModal}
-              className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 shrink-0"
+              onClick={handleOpenPharmacistModal}
+              className="btn-primary text-xs py-2 px-3.5 flex items-center gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
             >
-              <Users className="w-4 h-4 text-cyan-400" /> Manage Staff IDs
+              <Users className="w-4 h-4" /> Manage Pharmacists
             </button>
           )}
 
@@ -166,7 +184,7 @@ export default function DashboardPage() {
             <ShoppingCart className="w-4 h-4" /> FEFO POS Terminal
           </Link>
           <Link to="/inventory" className="btn-secondary text-xs py-2 px-3">
-            <PlusCircle className="w-4 h-4" /> Manage Catalog
+            <PlusCircle className="w-4 h-4" /> Medicine Catalog
           </Link>
         </div>
       </div>
@@ -342,157 +360,186 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Admin Staff Management Modal */}
-      {showStaffModal && (
-        <div className="modal-overlay" onClick={() => setShowStaffModal(false)}>
-          <div className="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+      {/* Admin Pharmacist Management Modal */}
+      {showPharmacistModal && isAdmin && (
+        <div className="modal-overlay" onClick={() => setShowPharmacistModal(false)}>
+          <div className="modal-content max-w-3xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-cyan-400" />
-                  <h3 className="text-lg font-bold text-white">Staff Management & Role Authorization</h3>
+                  <Users className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-lg font-bold text-white">Admin Pharmacist Management</h3>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">Admin Control Panel: Create and manage Pharmacist & Owner accounts</p>
+                <p className="text-xs text-gray-400 mt-0.5">Only ADMIN can register new pharmacists and manage account activation status</p>
               </div>
-              <button onClick={() => setShowStaffModal(false)} className="text-gray-400 hover:text-white">✕</button>
+              <button onClick={() => setShowPharmacistModal(false)} className="text-gray-400 hover:text-white">✕</button>
             </div>
 
-            {/* Add New Staff Member Form */}
-            <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-500/30 mb-6 space-y-3">
-              <h4 className="text-xs font-semibold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4" /> Add New Staff Member ID
+            {/* Add New Pharmacist Form (Backend forces role = "PHARMACIST") */}
+            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 mb-6 space-y-3">
+              <h4 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4" /> Add New Pharmacist Account
               </h4>
 
-              {staffError && (
-                <div className="p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-                  {staffError}
+              {pharmacistError && (
+                <div className="p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{pharmacistError}</span>
                 </div>
               )}
 
-              {staffSuccess && (
-                <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
-                  {staffSuccess}
+              {pharmacistSuccess && (
+                <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs space-y-1">
+                  <div className="flex items-center gap-2 font-bold">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>{pharmacistSuccess}</span>
+                  </div>
+                  {createdOtpCode && (
+                    <p className="text-[11px] text-gray-300">
+                      Dispatched Verification OTP Code: <code className="text-emerald-400 font-mono font-bold text-sm px-1 bg-black/40 rounded">{createdOtpCode}</code>
+                    </p>
+                  )}
                 </div>
               )}
 
-              <form onSubmit={handleAddStaffMember} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <form onSubmit={handleAddPharmacist} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label className="form-label text-[11px]">Full Name *</label>
+                  <label className="form-label text-[11px]">Pharmacist Name *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Vikram Singh"
-                    value={newStaff.name}
-                    onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+                    placeholder="e.g. John Doe"
+                    value={newPharmacist.name}
+                    onChange={(e) => setNewPharmacist({ ...newPharmacist, name: e.target.value })}
                     className="form-input text-xs py-1.5"
                   />
                 </div>
 
                 <div>
-                  <label className="form-label text-[11px]">Email Address (Login ID) *</label>
+                  <label className="form-label text-[11px]">Email Address *</label>
                   <input
                     type="email"
                     required
-                    placeholder="vikram@pharmacy.com"
-                    value={newStaff.email}
-                    onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                    placeholder="john@example.com"
+                    value={newPharmacist.email}
+                    onChange={(e) => setNewPharmacist({ ...newPharmacist, email: e.target.value })}
                     className="form-input text-xs py-1.5"
                   />
                 </div>
 
                 <div>
-                  <label className="form-label text-[11px]">Password *</label>
+                  <label className="form-label text-[11px]">Phone (Optional)</label>
                   <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={newStaff.password}
-                    onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                    type="text"
+                    placeholder="+1 555-0192"
+                    value={newPharmacist.phone}
+                    onChange={(e) => setNewPharmacist({ ...newPharmacist, phone: e.target.value })}
                     className="form-input text-xs py-1.5"
                   />
                 </div>
 
-                <div>
-                  <label className="form-label text-[11px]">Assign Role *</label>
-                  <select
-                    value={newStaff.role}
-                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="form-input text-xs py-1.5"
-                  >
-                    <option value="Pharmacist">Pharmacist</option>
-                    <option value="Admin">Admin / Pharmacy Owner</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2 pt-2 flex justify-end">
-                  <button type="submit" className="btn-primary text-xs py-2 px-4">
-                    <UserPlus className="w-3.5 h-3.5" /> Create Staff Account
+                <div className="sm:col-span-3 pt-1 flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400 italic">
+                    ℹ️ Backend strictly assigns role: <strong>PHARMACIST</strong>
+                  </span>
+                  <button type="submit" className="btn-primary text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500">
+                    <UserPlus className="w-3.5 h-3.5" /> Dispatch Activation & OTP
                   </button>
                 </div>
               </form>
             </div>
 
-            {/* Existing Staff List Table */}
-            <div>
-              <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-                Existing Staff Members ({staffList.length}):
+            {/* Pharmacist Search & Filter Bar */}
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                Pharmacists Roster ({totalPharmacists}):
               </h4>
 
-              <div className="table-container max-h-56 overflow-y-auto">
-                <table className="custom-table text-xs">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email (Login ID)</th>
-                      <th>Role</th>
-                      <th>Registered On</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingStaff ? (
-                      <tr>
-                        <td colSpan="5" className="text-center py-4 text-cyan-400">Loading staff list...</td>
-                      </tr>
-                    ) : staffList.length > 0 ? (
-                      staffList.map((st) => (
-                        <tr key={st.id}>
-                          <td className="font-bold text-white">{st.name}</td>
-                          <td className="text-cyan-300">{st.email}</td>
-                          <td>
-                            <span className={`badge ${st.role === 'Admin' ? 'badge-yellow' : 'badge-green'} text-[10px]`}>
-                              {st.role === 'Admin' ? 'Admin / Owner' : 'Pharmacist'}
-                            </span>
-                          </td>
-                          <td className="text-gray-400">{new Date(st.created_at).toLocaleDateString()}</td>
-                          <td>
-                            {st.id !== user?.id ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteStaff(st.id, st.name)}
-                                className="btn-danger text-[10px] py-1 px-2.5 flex items-center gap-1 cursor-pointer"
-                                title="Delete Staff Account"
-                              >
-                                <Trash2 className="w-3 h-3" /> Delete
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-cyan-400 font-bold italic">Current Session</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="5" className="text-center py-4 text-gray-500">No staff accounts found.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="relative flex items-center w-64">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search pharmacists..."
+                  value={pharmacistSearch}
+                  onChange={(e) => {
+                    setPharmacistSearch(e.target.value);
+                    fetchPharmacistsList(e.target.value);
+                  }}
+                  className="form-input text-xs py-1 pl-8 pr-2"
+                />
               </div>
             </div>
 
+            {/* Pharmacist List Table */}
+            <div className="table-container max-h-64 overflow-y-auto">
+              <table className="custom-table text-xs">
+                <thead>
+                  <tr>
+                    <th>Pharmacist Name</th>
+                    <th>Email Address</th>
+                    <th>Role</th>
+                    <th>Email Verification</th>
+                    <th>Account Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingPharmacists ? (
+                    <tr>
+                      <td colSpan="6" className="text-center py-4 text-emerald-400">Loading pharmacists...</td>
+                    </tr>
+                  ) : pharmacists.length > 0 ? (
+                    pharmacists.map((ph) => (
+                      <tr key={ph._id || ph.id}>
+                        <td className="font-bold text-white">{ph.name}</td>
+                        <td className="text-cyan-300 font-mono">{ph.email}</td>
+                        <td>
+                          <span className="badge badge-green text-[10px]">PHARMACIST</span>
+                        </td>
+                        <td>
+                          {ph.isVerified !== false ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-amber-400 font-semibold flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" /> Pending OTP
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {ph.isActive !== false ? (
+                            <span className="badge badge-green text-[10px]">Active</span>
+                          ) : (
+                            <span className="badge badge-red text-[10px]">Deactivated</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(ph._id || ph.id, ph.isActive !== false, ph.name)}
+                            className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                              ph.isActive !== false
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                            }`}
+                          >
+                            {ph.isActive !== false ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="text-center py-4 text-gray-500">No pharmacist records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
             <div className="pt-4 border-t border-white/10 flex justify-end">
-              <button onClick={() => setShowStaffModal(false)} className="btn-secondary text-xs">
+              <button onClick={() => setShowPharmacistModal(false)} className="btn-secondary text-xs">
                 Close
               </button>
             </div>
@@ -503,3 +550,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
