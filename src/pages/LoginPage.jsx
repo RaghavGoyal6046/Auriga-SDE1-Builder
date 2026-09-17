@@ -12,7 +12,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const executeLogin = async (loginEmail, loginPassword) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
@@ -35,15 +36,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    executeLogin(email, password);
-  };
-
-  const handleQuickDemo = (demoEmail, demoPass) => {
+  const handleFillDemo = (demoEmail, demoPass) => {
     setEmail(demoEmail);
     setPassword(demoPass);
-    executeLogin(demoEmail, demoPass);
+    setError('');
   };
 
   return (
@@ -57,22 +53,22 @@ export default function LoginPage() {
           <p className="text-xs text-gray-400 mt-1">FEFO Pharmacy Management System</p>
         </div>
 
-        {/* Quick Demo Preset Buttons */}
+        {/* Quick Demo Fill Buttons */}
         <div className="mb-6 p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30">
           <span className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider block mb-2 text-center">
-            ⚡ Quick 1-Click Evaluator Login:
+            ⚡ Fill Demo Credentials:
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => handleQuickDemo('pharmacist@pharma.com', 'pharmacy123')}
+              onClick={() => handleFillDemo('pharmacist@pharma.com', 'pharmacy123')}
               className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" /> Pharmacist
             </button>
             <button
               type="button"
-              onClick={() => handleQuickDemo('admin@pharma.com', 'admin123')}
+              onClick={() => handleFillDemo('admin@pharma.com', 'admin123')}
               className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-blue-300 text-xs font-semibold rounded-lg border border-blue-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" /> Admin
