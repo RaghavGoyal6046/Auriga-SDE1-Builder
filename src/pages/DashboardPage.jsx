@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Package, ShieldAlert, AlertTriangle, TrendingUp, ShoppingCart, PlusCircle, Search, CheckCircle, XCircle, ArrowUpRight, DollarSign, Clock, Users, UserPlus, Shield } from 'lucide-react';
+import { Package, ShieldAlert, AlertTriangle, TrendingUp, ShoppingCart, PlusCircle, Search, CheckCircle, XCircle, ArrowUpRight, DollarSign, Clock, Users, UserPlus, Shield, Trash2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, token } = useAuth();
@@ -78,6 +78,30 @@ export default function DashboardPage() {
 
       setStaffSuccess(`Success! ${data.user.role} account created for ${data.user.name}.`);
       setNewStaff({ name: '', email: '', password: '', role: 'Pharmacist' });
+      fetchStaffList();
+    } catch (err) {
+      setStaffError(err.message);
+    }
+  };
+
+  const handleDeleteStaff = async (staffId, staffName) => {
+    if (!window.confirm(`Are you sure you want to delete staff account for ${staffName}?`)) {
+      return;
+    }
+
+    setStaffError('');
+    setStaffSuccess('');
+
+    try {
+      const res = await fetch(`/api/auth/users/${staffId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete staff account');
+
+      setStaffSuccess(data.message);
       fetchStaffList();
     } catch (err) {
       setStaffError(err.message);
@@ -414,7 +438,7 @@ export default function DashboardPage() {
                 Existing Staff Members ({staffList.length}):
               </h4>
 
-              <div className="table-container max-h-48 overflow-y-auto">
+              <div className="table-container max-h-56 overflow-y-auto">
                 <table className="custom-table text-xs">
                   <thead>
                     <tr>
@@ -422,12 +446,13 @@ export default function DashboardPage() {
                       <th>Email (Login ID)</th>
                       <th>Role</th>
                       <th>Registered On</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loadingStaff ? (
                       <tr>
-                        <td colSpan="4" className="text-center py-4 text-cyan-400">Loading staff list...</td>
+                        <td colSpan="5" className="text-center py-4 text-cyan-400">Loading staff list...</td>
                       </tr>
                     ) : staffList.length > 0 ? (
                       staffList.map((st) => (
@@ -440,11 +465,25 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td className="text-gray-400">{new Date(st.created_at).toLocaleDateString()}</td>
+                          <td>
+                            {st.id !== user?.id ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteStaff(st.id, st.name)}
+                                className="btn-danger text-[10px] py-1 px-2.5 flex items-center gap-1 cursor-pointer"
+                                title="Delete Staff Account"
+                              >
+                                <Trash2 className="w-3 h-3" /> Delete
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-cyan-400 font-bold italic">Current Session</span>
+                            )}
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="4" className="text-center py-4 text-gray-500">No staff accounts found.</td>
+                        <td colSpan="5" className="text-center py-4 text-gray-500">No staff accounts found.</td>
                       </tr>
                     )}
                   </tbody>

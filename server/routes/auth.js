@@ -38,6 +38,35 @@ router.get('/users', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/auth/users/:id (Delete staff account - Admin only)
+router.delete('/users/:id', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ error: 'Access Denied: Admin authorization required' });
+  }
+
+  const targetId = parseInt(req.params.id);
+
+  if (targetId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot delete your own active Admin session' });
+  }
+
+  try {
+    const targetUser = await queryOne('SELECT id, name, email, role FROM users WHERE id = ?', [targetId]);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Staff account not found' });
+    }
+
+    // Reassign historical sales audit records to current Admin to preserve sales logs and satisfy foreign key constraints
+    await execute('UPDATE dispense_records SET user_id = ? WHERE user_id = ?', [req.user.id, targetId]);
+
+    await execute('DELETE FROM users WHERE id = ?', [targetId]);
+    res.json({ message: `Staff account for ${targetUser.name} deleted successfully` });
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete staff account' });
+  }
+});
+
 // POST /api/auth/register (First setup = Admin, subsequent = Admin authorization required)
 router.post('/register', async (req, res) => {
   const { name, email, password, role } = req.body || {};

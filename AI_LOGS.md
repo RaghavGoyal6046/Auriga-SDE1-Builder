@@ -139,4 +139,24 @@
 > - **UI Security Shield**: `RegisterPage.jsx` displays authorization status and blocks unauthorized public staff creation attempts. Pushed changes to GitHub.
 
 ---
+
+### Turn 13: Admin Staff Account Deletion Feature
+> **User Prompt**:  
+> "Implement staff account deletion functionality allowing an Admin to remove staff accounts with active session protection."
+
+> **AI Assistant Response**:  
+> Implemented staff deletion backend and UI:
+> - Added `DELETE /api/auth/users/:id` endpoint requiring Admin authorization with self-deletion safeguard (`targetId === req.user.id`).
+> - Added interactive **Delete** button with confirmation modal to the **`Manage Staff IDs`** table in `DashboardPage.jsx`. Verified live API deletion (`HTTP 200 OK`) and pushed changes to GitHub.
+
+---
+
+### Turn 14: Relational Foreign Key Integrity for Staff Account Deletion
+> **User Prompt**:  
+> "Investigate and resolve staff ID deletion failures when deleting accounts associated with historical dispense records."
+
+> **AI Assistant Response**:  
+> Identified SQLite `FOREIGN KEY constraint failed` error caused by `dispense_records` referencing deleted user IDs. Updated `DELETE /api/auth/users/:id` in `server/routes/auth.js` to automatically reassign historical dispense audit logs to the active Admin (`UPDATE dispense_records SET user_id = ? WHERE user_id = ?`) prior to deletion. This preserves historical sales audit logs and enables seamless staff account deletion. Verified with live API test (`HTTP 200 OK`) and pushed update to GitHub.
+
+---
 *End of Conversation Log.*
