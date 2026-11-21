@@ -1,6 +1,6 @@
 # AI Conversation Log — Auriga IT SDE I Builder Round
 
-**Project**: PharmaExpiry — First-Expiry-First-Out (FEFO) Pharmacy & Inventory Management System  
+**Project**: PharmaTrace — First-Expiry-First-Out (FEFO) Pharmacy & Inventory Management System  
 **Repository**: [https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder](https://github.com/RaghavGoyal6046/Auriga-SDE1-Builder)  
 **Candidate Name**: Raghav Goyal  
 **Institution**: Swami Keshvanand Institute of Technology (SKIT)  
@@ -339,6 +339,20 @@
 >    - Added a quick "👥 Manage Staff" link in the header of `public/dashboard.html` for Admin users.
 >    - Configured server routes in `server/index.js` for `/staff` and `/admin`.
 >    - Verified all 7 end-to-end FEFO audit tests pass with 100% success (`npm run test:fefo`).
+
+---
+
+### Turn 27: Project Rebranding to "PharmaTrace"
+> **User Prompt**:  
+> - "Suggest Better Name of This project ?"
+> - "PharmaTrace. Ye karde Naam Or git par puch bhi kar dena"
+
+> **AI Assistant Response**:  
+> Rebranded the entire project across documentation, UI, backend service signatures, and package manifests to **PharmaTrace**:
+> - Updated project titles, logos, brand badges, and copyright footers across all frontend views (`public/index.html`, `public/dashboard.html`, `public/dispense.html`, `public/inventory.html`, `public/batches.html`, `public/alerts.html`, `public/staff.html`, `public/login.html`, `public/register.html`, and `public/js/app.js`).
+> - Updated `package.json` manifest (`name: pharmatrace-fefo`), `README.md`, `REASONING.md`, `schema.sql`, `dataset.sql`, and `server/index.js` health check metadata.
+> - Verified all 7 end-to-end FEFO audit tests pass with 100% success (`npm run test:fefo`).
+> - Committed and pushed changes to remote GitHub repository.
 
 ---
 *End of Conversation Log.*

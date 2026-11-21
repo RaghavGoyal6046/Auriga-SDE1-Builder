@@ -1,5 +1,5 @@
 -- ========================================================
--- PharmaExpiry — Complete MySQL Database & Sample Dataset
+-- PharmaTrace — Complete MySQL Database & Sample Dataset
 -- Target: MySQL 8.x / MariaDB / MySQL Workbench / phpMyAdmin
 -- ========================================================
 

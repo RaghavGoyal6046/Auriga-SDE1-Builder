@@ -1,7 +1,7 @@
 {
-  "name": "pharmaexpiry-fefo",
+  "name": "pharmatrace-fefo",
   "version": "1.0.0",
-  "description": "PharmaExpiry - FEFO (First-Expiry-First-Out) Pharmacy & Inventory Management System (Node.js, Express, MySQL)",
+  "description": "PharmaTrace - FEFO (First-Expiry-First-Out) Pharmacy & Inventory Management System (Node.js, Express, MySQL)",
   "main": "server/index.js",
   "type": "module",
   "scripts": {

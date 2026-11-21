@@ -54,7 +54,7 @@ app.use('/outbox', outboxRoutes);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'UP',
-    service: 'PharmaExpiry API',
+    service: 'PharmaTrace API',
     database: getDatabaseType(),
     timestamp: new Date().toISOString()
   });
@@ -88,7 +88,7 @@ async function startServer() {
     await initDatabase();
     app.listen(PORT, () => {
       console.log(`=======================================================`);
-      console.log(`🚀 PharmaExpiry (Node.js + Express + MySQL) Running on port ${PORT}`);
+      console.log(`🚀 PharmaTrace (Node.js + Express + MySQL) Running on port ${PORT}`);
       console.log(`   Web Interface: http://localhost:${PORT}`);
       console.log(`   Health Check:  http://localhost:${PORT}/api/health`);
       console.log(`   Database Mode: ${getDatabaseType()}`);

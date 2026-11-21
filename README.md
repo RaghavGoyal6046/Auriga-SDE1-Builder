@@ -1,6 +1,6 @@
-# PharmaExpiry — FEFO Pharmacy & Stock Management System
+# PharmaTrace — FEFO Pharmacy & Stock Management System
 
-PharmaExpiry is an intelligent, production-grade full-stack web application built for retail and hospital pharmacies to strictly enforce **First-Expiry-First-Out (FEFO)** inventory management while maintaining role-based authorization for **ADMIN** (Pharmacy Owner) and **PHARMACIST** (Staff) users.
+PharmaTrace is an intelligent, production-grade full-stack web application built for retail and hospital pharmacies to strictly enforce **First-Expiry-First-Out (FEFO)** inventory management while maintaining role-based authorization for **ADMIN** (Pharmacy Owner) and **PHARMACIST** (Staff) users.
 
 The system is built purely with **Node.js, Express.js, and MySQL** — with zero React or frontend bundler dependencies.
 
@@ -54,7 +54,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=pharmacy.alerts.service@gmail.com
 SMTP_PASSWORD=your_app_specific_password_here
-SMTP_FROM="PharmaExpiry Auth System <pharmacy.alerts.service@gmail.com>"
+SMTP_FROM="PharmaTrace Auth System <pharmacy.alerts.service@gmail.com>"
 ```
 
 ### 3. Run FEFO & System Audit Test Suite

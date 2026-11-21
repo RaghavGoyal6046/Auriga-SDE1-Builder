@@ -1,6 +1,6 @@
-# Architectural Reasoning & System Design Document — PharmaExpiry
+# Architectural Reasoning & System Design Document — PharmaTrace
 
-This document details the engineering thought process, algorithm design, architectural decisions, and testing rationale behind **PharmaExpiry**, built for the Auriga IT Campus Recruitment Drive (Builder Round).
+This document details the engineering thought process, algorithm design, architectural decisions, and testing rationale behind **PharmaTrace**, built for the Auriga IT Campus Recruitment Drive (Builder Round).
 
 ---
 

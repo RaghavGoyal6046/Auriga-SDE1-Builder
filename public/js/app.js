@@ -1,5 +1,5 @@
 /**
- * PharmaExpiry Client Engine (Vanilla JavaScript)
+ * PharmaTrace Client Engine (Vanilla JavaScript)
  */
 
 const API_BASE = '/api';
@@ -105,7 +105,7 @@ function renderNavbar(activePage = '') {
   navContainer.innerHTML = `
     <nav class="navbar">
       <a href="/" class="nav-brand">
-        <span>💊 PharmaExpiry</span>
+        <span>💊 PharmaTrace</span>
         <span class="brand-badge">FEFO CORE</span>
       </a>
 

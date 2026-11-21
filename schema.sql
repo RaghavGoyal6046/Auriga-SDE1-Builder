@@ -1,5 +1,5 @@
 -- ========================================================
--- PharmaExpiry — MySQL Database Schema & Table Definitions
+-- PharmaTrace — MySQL Database Schema & Table Definitions
 -- Target Database: MySQL 8.x / MariaDB 10.x
 -- ========================================================
 
