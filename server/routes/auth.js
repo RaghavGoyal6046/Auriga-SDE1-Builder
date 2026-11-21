@@ -1,7 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
 import { queryOne, queryAll, execute } from '../db/database.js';
 import { JWT_SECRET, JWT_EXPIRES_IN, authenticateToken } from '../middleware/auth.js';
 import { loginRateLimiter, otpRateLimiter } from '../middleware/security.js';
@@ -10,19 +9,11 @@ import { generateAndSendOtp, verifyOtpCode } from '../services/otpService.js';
 const router = express.Router();
 
 /**
- * Helper to count total registered users across MongoDB and SQLite
+ * Helper to count total registered users
  */
 async function getTotalUserCount() {
-  let count = 0;
-  try {
-    count = await User.countDocuments();
-  } catch (_) {}
-
-  if (count === 0) {
-    const sqliteCount = await queryOne('SELECT COUNT(*) as count FROM users');
-    count = sqliteCount ? sqliteCount.count : 0;
-  }
-  return count;
+  const result = await queryOne('SELECT COUNT(*) as count FROM users');
+  return result ? result.count : 0;
 }
 
 /**
@@ -52,7 +43,7 @@ router.get('/setup-status', async (req, res) => {
  * POST /api/auth/register
  * Rules:
  * - If 0 users exist: Allow public registration. First user automatically receives role: "ADMIN".
- * - If users exist: Reject public registration with "Public registration is disabled. Please contact the administrator."
+ * - If users exist: Reject public registration with 403 Forbidden.
  * - Backend strictly controls assigned role. Client cannot choose role.
  */
 router.post('/register', async (req, res) => {
@@ -78,11 +69,7 @@ router.post('/register', async (req, res) => {
     const assignedRole = 'ADMIN';
 
     // Check existing email
-    let existingUser = null;
-    try {
-      existingUser = await User.findOne({ email: cleanEmail });
-    } catch (_) {}
-
+    const existingUser = await queryOne('SELECT id FROM users WHERE LOWER(email) = ?', [cleanEmail]);
     if (existingUser) {
       return res.status(400).json({ error: 'An account with this email address already exists' });
     }
@@ -90,28 +77,13 @@ router.post('/register', async (req, res) => {
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(password.toString(), salt);
 
-    let mongoUser = null;
-    try {
-      mongoUser = await User.create({
-        name: name.toString().trim(),
-        email: cleanEmail,
-        passwordHash,
-        phone: cleanPhone,
-        role: assignedRole,
-        isActive: true,
-        isVerified: true, // First Admin is automatically verified
-      });
-    } catch (dbErr) {
-      console.warn('MongoDB User save fallback to SQLite:', dbErr.message);
-    }
-
-    // Save in SQLite for dual storage fallback
-    const sqliteRes = await execute(
-      `INSERT INTO users (name, email, password, phone, role) VALUES (?, ?, ?, ?, ?)`,
+    const insertResult = await execute(
+      `INSERT INTO users (name, email, password, phone, role, is_active, is_verified)
+       VALUES (?, ?, ?, ?, ?, 1, 1)`,
       [name.toString().trim(), cleanEmail, passwordHash, cleanPhone, assignedRole]
     );
 
-    const userId = mongoUser ? mongoUser._id : sqliteRes.lastID;
+    const userId = insertResult.insertId || insertResult.lastID;
 
     const userPayload = {
       id: userId,
@@ -150,52 +122,24 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   try {
     const cleanEmail = email.toString().toLowerCase().trim();
 
-    // 1. Find user in MongoDB
-    let user = null;
-    try {
-      user = await User.findOne({ email: cleanEmail }).select('+passwordHash');
-    } catch (_) {}
-
-    // 2. Fallback SQLite lookup
-    let isMatch = false;
-    let userId = null;
-    let userRole = 'PHARMACIST';
-    let userName = '';
-    let isActive = true;
-    let isVerified = true;
-
-    if (user) {
-      userId = user._id;
-      userName = user.name;
-      userRole = user.role;
-      isActive = user.isActive;
-      isVerified = user.isVerified;
-
-      if (!isActive) {
-        return res.status(403).json({ error: 'Your account has been deactivated. Please contact the administrator.' });
-      }
-
-      isMatch = user.comparePassword(password);
-    } else {
-      const sqliteUser = await queryOne('SELECT * FROM users WHERE LOWER(email) = ?', [cleanEmail]);
-      if (!sqliteUser || !sqliteUser.password) {
-        return res.status(401).json({ error: 'Invalid email or password' });
-      }
-
-      userId = sqliteUser.id;
-      userName = sqliteUser.name;
-      userRole = sqliteUser.role.toUpperCase();
-      isActive = true;
-      isVerified = true;
-
-      isMatch = bcrypt.compareSync(password.toString(), sqliteUser.password.toString());
+    // Look up user in database
+    const user = await queryOne('SELECT * FROM users WHERE LOWER(email) = ?', [cleanEmail]);
+    if (!user || !user.password) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    const isActive = user.is_active === 1 || user.is_active === true || user.is_active === '1';
+    if (!isActive) {
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact the administrator.' });
+    }
+
+    const isMatch = bcrypt.compareSync(password.toString(), user.password.toString());
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    if (isVerified === false) {
+    const isVerified = user.is_verified === 1 || user.is_verified === true || user.is_verified === '1';
+    if (!isVerified) {
       return res.status(403).json({
         error: 'Your account email is not yet verified. Please enter the verification OTP code sent to your email.',
         requiresVerification: true,
@@ -203,22 +147,16 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       });
     }
 
-    // Update lastLoginAt
-    try {
-      if (user) {
-        user.lastLoginAt = new Date();
-        await user.save();
-      }
-    } catch (_) {}
+    const userRole = (user.role || 'PHARMACIST').toUpperCase();
 
     const userPayload = {
-      id: userId,
-      userId,
-      name: userName,
+      id: user.id,
+      userId: user.id,
+      name: user.name,
       email: cleanEmail,
       role: userRole,
-      isActive,
-      isVerified,
+      isActive: true,
+      isVerified: true,
     };
 
     const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -242,13 +180,13 @@ router.get('/me', authenticateToken, (req, res) => {
   const user = req.user;
   res.json({
     user: {
-      id: user._id || user.id,
+      id: user.id || user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      phone: user.phone || null,
       isActive: user.isActive !== false,
       isVerified: user.isVerified !== false,
-      createdAt: user.createdAt || new Date().toISOString(),
     },
   });
 });
@@ -266,22 +204,19 @@ router.post('/request-otp', otpRateLimiter, async (req, res) => {
   }
 
   try {
-    let user = null;
-    try {
-      user = await User.findOne({ email: targetEmail });
-    } catch (_) {}
+    const user = await queryOne('SELECT id, name FROM users WHERE LOWER(email) = ?', [targetEmail]);
 
     const otpRes = await generateAndSendOtp(
       targetEmail,
       purpose || 'EMAIL_VERIFICATION',
-      user ? user._id : null,
+      user ? user.id : null,
       user ? user.name : ''
     );
 
     res.json({
       message: `Verification OTP dispatched to ${targetEmail}`,
       expiresAt: otpRes.expiresAt,
-      otp: otpRes.rawOtp, // For local dev testing convenience
+      otp: otpRes.rawOtp, // For convenience in local testing
     });
   } catch (err) {
     console.error('Error requesting OTP:', err);
@@ -308,26 +243,19 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: result.message });
     }
 
-    // Find and verify User in MongoDB
-    let user = null;
-    try {
-      user = await User.findOne({ email: targetEmail }).select('+passwordHash');
-      if (user) {
-        user.isVerified = true;
-        user.isActive = true;
-        if (newPassword) {
-          const salt = bcrypt.genSaltSync(10);
-          user.passwordHash = bcrypt.hashSync(newPassword.toString(), salt);
-        }
-        await user.save();
-      }
-    } catch (_) {}
-
-    // Update SQLite if applicable
+    // Activate user and mark verified
     if (newPassword) {
       const salt = bcrypt.genSaltSync(10);
       const passwordHash = bcrypt.hashSync(newPassword.toString(), salt);
-      await execute('UPDATE users SET password = ? WHERE LOWER(email) = ?', [passwordHash, targetEmail]);
+      await execute(
+        'UPDATE users SET password = ?, is_verified = 1, is_active = 1 WHERE LOWER(email) = ?',
+        [passwordHash, targetEmail]
+      );
+    } else {
+      await execute(
+        'UPDATE users SET is_verified = 1, is_active = 1 WHERE LOWER(email) = ?',
+        [targetEmail]
+      );
     }
 
     res.json({
@@ -341,4 +269,3 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 export default router;
-

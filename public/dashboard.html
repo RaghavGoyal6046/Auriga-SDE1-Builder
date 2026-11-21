@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Executive Operations Dashboard</h1>
+        <p class="page-subtitle">Real-time inventory metrics, FEFO telemetry, and sales auditing</p>
+      </div>
+      <div>
+        <a href="/dispense" class="btn btn-primary">⚡ Open FEFO POS Dispenser</a>
+      </div>
+    </div>
+
+    <!-- Quick In-Date Stock Inquiry -->
+    <div class="lookup-box">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff;">🔍 In-Date Medicine Stock Inquiry</h3>
+          <p style="color: var(--text-muted); font-size: 0.825rem;">Verify whether a medicine is in date before dispensing</p>
+        </div>
+        <span class="badge badge-neutral">Instant FEFO Query</span>
+      </div>
+
+      <form class="lookup-form" onsubmit="handleQuickCheck(event)">
+        <input 
+          type="text" 
+          id="dash-lookup-input" 
+          class="lookup-input" 
+          placeholder="Type medicine name (e.g. Paracetamol, Amoxicillin, Atorvastatin)..." 
+          required
+        />
+        <button type="submit" class="btn btn-primary">Check In-Date Stock</button>
+      </form>
+      <div id="dash-lookup-result" style="margin-top: 1rem; display: none;"></div>
+    </div>
+
+    <!-- Telemetry Metrics Grid -->
+    <div class="grid grid-cols-3" style="margin-bottom: 2rem;">
+      <div class="card">
+        <div class="card-title">Sellable In-Date Stock</div>
+        <div class="card-value" id="card-sellable" style="color: var(--success);">--</div>
+        <div class="card-subtext" id="card-sellable-val">Value: --</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Expired Quarantined Stock</div>
+        <div class="card-value" id="card-expired" style="color: var(--danger);">--</div>
+        <div class="card-subtext" id="card-expired-val">Locked Loss: --</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Batches Expiring in 30 Days</div>
+        <div class="card-value" id="card-expiring-soon" style="color: var(--warning);">--</div>
+        <div class="card-subtext">Immediate FEFO priority required</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Today's Dispense Revenue</div>
+        <div class="card-value" id="card-today-rev" style="color: var(--primary);">--</div>
+        <div class="card-subtext" id="card-today-count">Transactions: --</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Catalog Medicines</div>
+        <div class="card-value" id="card-med-count">--</div>
+        <div class="card-subtext">Active pharmaceutical products</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Total Active Batches</div>
+        <div class="card-value" id="card-batch-count">--</div>
+        <div class="card-subtext">Independently audited lot numbers</div>
+      </div>
+    </div>
+
+    <!-- Recent Transactions Table -->
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #fff;">Recent Dispense Transactions</h2>
+          <p style="color: var(--text-muted); font-size: 0.825rem;">Live audit trail of FEFO stock sales and invoices</p>
+        </div>
+        <a href="/dispense" class="btn btn-secondary btn-sm">New Dispense +</a>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference No</th>
+              <th>Patient Name</th>
+              <th>Dispensed By</th>
+              <th>Total Amount</th>
+              <th>Date &amp; Time</th>
+            </tr>
+          </thead>
+          <tbody id="recent-dispenses-body">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2rem;">Loading recent transactions...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    PharmaExpiry &copy; 2026. Built with Node.js, Express &amp; MySQL.
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    if (requireAuth()) {
+      renderNavbar('dashboard');
+      loadDashboardStats();
+    }
+
+    async function loadDashboardStats() {
+      const { ok, data } = await apiFetch('/dashboard/stats');
+      if (!ok || !data) return;
+
+      document.getElementById('card-sellable').innerText = (data.sellableStock?.units || 0) + ' units';
+      document.getElementById('card-sellable-val').innerText = 'Est. Value: ' + formatCurrency(data.sellableStock?.value || 0);
+
+      document.getElementById('card-expired').innerText = (data.expiredStock?.units || 0) + ' units';
+      document.getElementById('card-expired-val').innerText = 'Locked Loss: ' + formatCurrency(data.expiredStock?.value || 0);
+
+      document.getElementById('card-expiring-soon').innerText = data.expiringSoonCount || 0;
+      document.getElementById('card-today-rev').innerText = formatCurrency(data.todaySales?.revenue || 0);
+      document.getElementById('card-today-count').innerText = `${data.todaySales?.count || 0} sales recorded today`;
+
+      document.getElementById('card-med-count').innerText = data.medicinesCount || 0;
+      document.getElementById('card-batch-count').innerText = data.batchesCount || 0;
+
+      // Render recent dispenses
+      const tbody = document.getElementById('recent-dispenses-body');
+      const list = data.recentDispenses || [];
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2rem;">No dispense transactions recorded yet today.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => `
+        <tr>
+          <td><strong style="color: var(--primary); font-family: monospace;">${item.reference_no}</strong></td>
+          <td>${item.patient_name}</td>
+          <td>${item.dispensed_by || 'Staff'}</td>
+          <td><strong style="color: var(--success);">${formatCurrency(item.total_amount)}</strong></td>
+          <td>${new Date(item.dispensed_at).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function handleQuickCheck(e) {
+      e.preventDefault();
+      const input = document.getElementById('dash-lookup-input').value.trim();
+      const resBox = document.getElementById('dash-lookup-result');
+      if (!input) return;
+
+      resBox.style.display = 'block';
+      resBox.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">Checking FEFO stock...</div>';
+
+      const { ok, data } = await apiFetch(`/medicines/check-indate?name=${encodeURIComponent(input)}`);
+      if (!ok || !data || !data.found) {
+        resBox.innerHTML = `<div class="badge badge-danger">Not Found: No medicine matching "${input}" found.</div>`;
+        return;
+      }
+
+      if (data.inDateAvailable) {
+        resBox.innerHTML = `
+          <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 0.85rem;">
+            <span class="badge badge-success">IN-DATE STOCK AVAILABLE</span>
+            <span style="color: #6ee7b7; font-weight: 600; margin-left: 0.5rem;">${data.message}</span>
+            <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 0.4rem;">
+              Earliest batch expires on: <strong>${data.earliestExpiryDate}</strong> (Shelf: ${data.nextBatchToDispense?.shelf_location})
+            </div>
+          </div>
+        `;
+      } else {
+        resBox.innerHTML = `
+          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); padding: 0.85rem;">
+            <span class="badge badge-danger">NO SELLABLE STOCK</span>
+            <span style="color: #fca5a5; margin-left: 0.5rem;">${data.message}</span>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>

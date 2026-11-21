@@ -260,5 +260,67 @@
 > - **Frontend UI (`DashboardPage.jsx`)**: Updated the Add Pharmacist modal form button to **"Create Pharmacist Account"**, added a Password field, and removed the "Email Verification / Pending OTP" column from the Pharmacist Roster table to display direct Account Status (`Active`/`Deactivated`). Verified build (`npm run build`) and passed all audit tests (`npm run test:fefo`).
 
 ---
+### Turn 23: Complete Removal of React & Migration to Pure Node.js, Express & MySQL Stack
+> **User Prompt**:  
+> "is project m s react hata de sirf node express my sql ka use karke bana"  
+> *(Translation: "Remove React from this project and build it using only Node.js, Express, and MySQL.")*
+
+> **AI Assistant Response**:  
+> Executed complete architectural overhaul:
+> 1. **Removed React & Bundling Stack**:
+>    - Uninstalled React, React DOM, React Router, Lucide React, `@tailwindcss/vite`, `@vitejs/plugin-react`, Vite, and Mongoose.
+>    - Deleted all React source files and build configurations: `src/`, `dist/`, `vite.config.js`, `index.html`.
+>    - Updated `package.json` scripts: `"start": "node server/index.js"`, `"dev": "node --watch server/index.js"`, `"test:fefo": "node server/tests/fefo.test.js"`.
+> 2. **Built MySQL Database Layer**:
+>    - Installed `mysql2` driver with promise and connection pooling support.
+>    - Created `schema.sql` defining 7 relational tables: `users`, `medicines`, `batches`, `dispense_records`, `dispense_items`, `outbox`, `otps`.
+>    - Implemented `server/db/database.js` with automatic database/table initialization, foreign key constraints, indexing on expiry dates, initial FEFO sample data seeding, and fallback support.
+> 3. **Native Vanilla Web Interface (`public/`)**:
+>    - Built pure HTML5, modern CSS3 (Clinical Glassmorphism), and Vanilla JavaScript frontend served directly by Express without bundlers or build steps:
+>      - `public/index.html`: System landing page with live "Quick In-Date Medicine Lookup" search widget and real-time stock counters.
+>      - `public/dashboard.html`: Operations dashboard with 6 telemetry cards, recent transactions, and stock breakdown.
+>      - `public/dispense.html`: FEFO Point of Sale workbench with live batch allocation preview, confirmation, and modal invoice receipt.
+>      - `public/inventory.html`: Medicines catalog with search, category filtering, and "Add Medicine" modal.
+>      - `public/batches.html`: Batch registry tracking lot numbers, expiry dates, risk level badges, and "Register Batch" modal.
+>      - `public/alerts.html`: Expiry risk telemetry, quarantined lots monitor, and low-stock re-order alerts.
+>      - `public/login.html` & `public/register.html`: Secure authentication and First-User Admin bootstrap.
+> 4. **Updated Backend API & Test Suite**:
+>    - Re-engineered all routes (`auth.js`, `admin.js`, `medicines.js`, `batches.js`, `dispense.js`, `alerts.js`, `dashboard.js`, `clock.js`, `outbox.js`) to use standard SQL.
+>    - Verified all 7 end-to-end audit test suites pass with 100% success (`npm run test:fefo`).
+
+---
+
+### Turn 24: First-User Setup, Expanded Multi-Batch Dataset & Inventory Date Inputs
+> **User Prompt**:  
+> - "admin ka credential or password bata" / "remove the first user from data base i will create"
+> - "Jab Hum New Medicine add karte h tab Uski dates k option nahi aa rahe h"
+> - "In this add more different medicine of different batches"
+
+> **AI Assistant Response**:  
+> 1. **First-User Bootstrap**: Cleared existing users from database so the owner could register their primary Admin account (`Raghav Goyal`, `raghavgoyal6046@gmail.com`, `role: ADMIN`) directly from `/register`.
+> 2. **Inventory Modal Date Inputs**: Updated `public/inventory.html` and `server/routes/medicines.js` so that adding a new medicine directly accepts initial batch details: Batch Number, Initial Stock Quantity, Manufacturing Date (`mfg_date`), Expiry Date (`expiry_date`), Unit Price, and Shelf Rack location.
+> 3. **Expanded Multi-Batch Dataset (`dataset.sql`)**: Generated an expanded dataset of 22 essential medicines across 11 therapeutic categories with 56 diverse batches (short-dated, mid-dated, long-dated, and expired lots) using dynamic relative SQL date intervals (`DATE_ADD(CURDATE(), INTERVAL ...)`).
+
+---
+
+### Turn 25: Dispense Error Resolution & Multi-Medicine Prescription POS
+> **User Prompt**:  
+> - "Why Failed to dispence"
+> - "Sun kisi Patient ko medicine de raha hu to usko mujhe har ek medicine baar baar uske naame s add karni padti h m ek sath ek patient ko multiple medicine de saku esa kar"
+
+> **AI Assistant Response**:  
+> 1. **Dispense Error Resolution**:
+>    - Diagnosed the `"Failed to process dispense transaction"` error: user 16 (`Raghav Goyal`) was missing after a previous database wipe while the client held a cached JWT with `user_id = 16`, causing a foreign key violation on `dispense_records(user_id)`.
+>    - Restored user `Raghav Goyal` (ID 16, ADMIN) and added defensive user ID fallback resolution in `server/routes/dispense.js`.
+> 2. **Multi-Medicine POS Prescription Dispenser**:
+>    - Upgraded `public/dispense.html` into a full-featured multi-item prescription POS workbench.
+>    - Added a Prescription Cart where pharmacists can add multiple different medicines (with quantity and real-time stock counters) under a single patient name.
+>    - Implemented multi-item FEFO allocation preview simulating exact batch draws and subtotals across all prescribed medicines.
+>    - Atomic stock deduction and single official invoice generation with complete itemized receipt modal.
+>    - Upgraded backend `server/routes/dispense.js` to consolidate duplicate medicines and execute atomic multi-item stock deductions.
+>    - All 7 end-to-end FEFO audit tests pass with 100% success (`npm run test:fefo`).
+
+---
 *End of Conversation Log.*
+
 

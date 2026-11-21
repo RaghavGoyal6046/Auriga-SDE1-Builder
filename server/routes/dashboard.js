@@ -44,13 +44,13 @@ router.get('/stats', async (req, res) => {
       [today, date30Str]
     );
 
-    // Today's Sales (matching today's date in UTC or local date)
+    // Today's Sales (matching today's date)
     const todaySalesRes = await queryOne(
       `SELECT 
          COUNT(*) as count,
          COALESCE(SUM(total_amount), 0) as revenue
        FROM dispense_records
-       WHERE date(dispensed_at) = date('now') OR date(dispensed_at) = ?`,
+       WHERE DATE(dispensed_at) = ?`,
       [today]
     );
 

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expiry Risk &amp; Inventory Alerts — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Expiry Risk Alerts &amp; Outbox Telemetry</h1>
+        <p class="page-subtitle">Proactive risk intelligence: expired batches quarantined and low stock re-order warnings</p>
+      </div>
+      <div>
+        <button onclick="triggerClockDailyScan()" class="btn btn-secondary">⏰ Run Expiry Scan Job</button>
+      </div>
+    </div>
+
+    <!-- Alert Counters -->
+    <div class="grid grid-cols-4" style="margin-bottom: 2rem;">
+      <div class="card" style="border-left: 4px solid var(--danger);">
+        <div class="card-title">Quarantined Expired</div>
+        <div class="card-value" id="cnt-expired" style="color: var(--danger);">--</div>
+        <div class="card-subtext">Immediate quarantine required</div>
+      </div>
+
+      <div class="card" style="border-left: 4px solid var(--warning);">
+        <div class="card-title">Expiring in 30 Days</div>
+        <div class="card-value" id="cnt-30" style="color: var(--warning);">--</div>
+        <div class="card-subtext">High priority FEFO dispatch</div>
+      </div>
+
+      <div class="card" style="border-left: 4px solid #fde047;">
+        <div class="card-title">Expiring in 60 Days</div>
+        <div class="card-value" id="cnt-60" style="color: #fde047;">--</div>
+        <div class="card-subtext">Medium risk advisory</div>
+      </div>
+
+      <div class="card" style="border-left: 4px solid var(--primary);">
+        <div class="card-title">Low Stock Alerts</div>
+        <div class="card-value" id="cnt-low" style="color: var(--primary);">--</div>
+        <div class="card-subtext">Stock &le; Re-order threshold</div>
+      </div>
+    </div>
+
+    <!-- 1. Expired Batches Table -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #f87171;">
+            🚨 Expired Batches (Quarantined from POS)
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem;">These lots cannot be sold and must be physically removed from active shelves</p>
+        </div>
+        <span class="badge badge-danger">100% BLOCKED FROM DISPENSING</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Batch Number</th>
+              <th>Medicine Name</th>
+              <th>Available Units</th>
+              <th>Expiry Date</th>
+              <th>Shelf Location</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="expired-tbody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">Loading expired lots...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. Batches Expiring in 30 Days -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #fbbf24;">
+            ⚠️ Batches Expiring within 30 Days (High Priority FEFO)
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem;">Stock being prioritized for first delivery by the FEFO engine</p>
+        </div>
+        <span class="badge badge-warning">ACTIVE FEFO TARGETS</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Batch Number</th>
+              <th>Medicine Name</th>
+              <th>Available Units</th>
+              <th>Expiry Date</th>
+              <th>Shelf Rack</th>
+            </tr>
+          </thead>
+          <tbody id="expiring30-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">Loading high-priority batches...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3. Low Stock Medicines -->
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">
+            📦 Low In-Date Stock Medicines (Re-Order Triggers)
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem;">Medicines where sellable in-date stock has dropped to or below threshold</p>
+        </div>
+        <span class="badge badge-neutral">PURCHASE REQUISITION</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Medicine Name</th>
+              <th>Category</th>
+              <th>Sellable Stock</th>
+              <th>Re-order Level</th>
+              <th>Stock Status</th>
+            </tr>
+          </thead>
+          <tbody id="lowstock-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">Loading low stock alerts...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    PharmaExpiry &copy; 2026. Built with Node.js, Express &amp; MySQL.
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    if (requireAuth()) {
+      renderNavbar('alerts');
+      loadAlerts();
+    }
+
+    async function loadAlerts() {
+      const { ok, data } = await apiFetch('/alerts/expiring');
+      if (!ok || !data) return;
+
+      const summary = data.summary || {};
+      document.getElementById('cnt-expired').innerText = summary.expiredCount || 0;
+      document.getElementById('cnt-30').innerText = summary.expiring30Count || 0;
+      document.getElementById('cnt-60').innerText = summary.expiring60Count || 0;
+      document.getElementById('cnt-low').innerText = summary.lowStockCount || 0;
+
+      // 1. Expired batches
+      const expBody = document.getElementById('expired-tbody');
+      const expiredList = data.expiredBatches || [];
+      if (expiredList.length === 0) {
+        expBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--success); padding: 1.5rem;">🎉 Zero expired batches in inventory!</td></tr>';
+      } else {
+        expBody.innerHTML = expiredList.map(b => `
+          <tr>
+            <td><strong style="color: var(--danger); font-family: monospace;">${b.batch_number}</strong></td>
+            <td><strong>${b.medicine_name}</strong></td>
+            <td><strong>${b.available_quantity}</strong> ${b.unit || ''}</td>
+            <td><span class="badge badge-danger">${b.expiry_date}</span></td>
+            <td>${b.shelf_location}</td>
+            <td><span class="badge badge-neutral">QUARANTINED</span></td>
+          </tr>
+        `).join('');
+      }
+
+      // 2. Expiring in 30 days
+      const d30Body = document.getElementById('expiring30-tbody');
+      const d30List = data.expiring30Batches || [];
+      if (d30List.length === 0) {
+        d30Body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No active batches expiring within the next 30 days.</td></tr>';
+      } else {
+        d30Body.innerHTML = d30List.map(b => `
+          <tr>
+            <td><strong style="color: var(--warning); font-family: monospace;">${b.batch_number}</strong></td>
+            <td><strong>${b.medicine_name}</strong></td>
+            <td><strong>${b.available_quantity}</strong> ${b.unit || ''}</td>
+            <td><span class="badge badge-warning">${b.expiry_date}</span></td>
+            <td>${b.shelf_location}</td>
+          </tr>
+        `).join('');
+      }
+
+      // 3. Low stock
+      const lowBody = document.getElementById('lowstock-tbody');
+      const lowList = data.lowStockMedicines || [];
+      if (lowList.length === 0) {
+        lowBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--success); padding: 1.5rem;">All medicines have healthy stock above re-order thresholds.</td></tr>';
+      } else {
+        lowBody.innerHTML = lowList.map(m => `
+          <tr>
+            <td><strong style="color: #fff;">${m.name}</strong></td>
+            <td><span class="badge badge-neutral">${m.category}</span></td>
+            <td><strong style="color: var(--danger);">${m.sellable_stock || 0} ${m.unit}</strong></td>
+            <td>${m.reorder_level} ${m.unit}</td>
+            <td><span class="badge badge-warning">BELOW THRESHOLD</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    async function triggerClockDailyScan() {
+      showToast('Running automated daily expiry & outbox job...', 'info');
+      const { ok, data } = await apiFetch('/clock', { method: 'POST' });
+      if (ok) {
+        showToast('Daily job completed: Quarantined expired and synced outbox.', 'success');
+        loadAlerts();
+      } else {
+        showToast('Daily job failed', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

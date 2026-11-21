@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First Admin Setup — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="badge badge-warning" style="margin-bottom: 0.5rem;">FIRST-USER BOOTSTRAP</span>
+        <h2 style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem;">Primary Admin Setup</h2>
+        <p id="setup-status-subtext" style="color: var(--text-muted); font-size: 0.875rem;">
+          Checking initial database registration status...
+        </p>
+      </div>
+
+      <div id="status-notice" style="display: none; border-radius: var(--radius-sm); padding: 0.85rem 1rem; font-size: 0.85rem; margin-bottom: 1.25rem;"></div>
+
+      <form id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="name" class="form-control" placeholder="Dr. R. K. Sharma" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Admin Email Address</label>
+          <input type="email" id="email" class="form-control" placeholder="owner@pharmacy.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number (Optional)</label>
+          <input type="text" id="phone" class="form-control" placeholder="+91-9876543210">
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+          Register as Primary Admin
+        </button>
+      </form>
+
+      <div style="margin-top: 1.25rem; text-align: center; font-size: 0.825rem; color: var(--text-muted);">
+        Already set up? <a href="/login">Sign In here</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    renderNavbar('register');
+
+    async function checkSetupStatus() {
+      const { ok, data } = await apiFetch('/auth/setup-status');
+      const notice = document.getElementById('status-notice');
+      const subtext = document.getElementById('setup-status-subtext');
+      const submitBtn = document.getElementById('submit-btn');
+
+      if (ok && data) {
+        if (!data.isFirstSetup) {
+          subtext.innerText = 'Initial Admin Setup is already completed.';
+          notice.style.display = 'block';
+          notice.style.background = 'rgba(239, 68, 68, 0.15)';
+          notice.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+          notice.style.color = '#fca5a5';
+          notice.innerHTML = `
+            <strong>Notice:</strong> Initial admin user already exists. Public registration is locked.
+            Only the pharmacy Admin can create new staff accounts from the Admin panel.
+            <div style="margin-top: 0.5rem;"><a href="/login" class="btn btn-secondary btn-sm">Go to Login</a></div>
+          `;
+          submitBtn.disabled = true;
+          submitBtn.innerText = 'Registration Disabled';
+        } else {
+          subtext.innerText = 'Zero users exist in database. First registered user will automatically become ADMIN.';
+          notice.style.display = 'block';
+          notice.style.background = 'rgba(16, 185, 129, 0.15)';
+          notice.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+          notice.style.color = '#6ee7b7';
+          notice.innerText = '✨ Bootstrap mode active: You are creating the initial Primary Administrator account.';
+        }
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const phone = document.getElementById('phone').value.trim();
+      const submitBtn = document.getElementById('submit-btn');
+      const notice = document.getElementById('status-notice');
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Bootstrapping Admin...';
+
+      const { ok, data } = await apiFetch('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, phone })
+      });
+
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Register as Primary Admin';
+
+      if (!ok || !data.token) {
+        notice.style.display = 'block';
+        notice.style.background = 'rgba(239, 68, 68, 0.15)';
+        notice.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        notice.style.color = '#fca5a5';
+        notice.innerText = data.error || 'Failed to register account.';
+        return;
+      }
+
+      setSession(data.token, data.user);
+      showToast('Admin setup completed successfully!', 'success');
+      window.location.href = '/dashboard';
+    }
+
+    checkSetupStatus();
+  </script>
+</body>
+</html>

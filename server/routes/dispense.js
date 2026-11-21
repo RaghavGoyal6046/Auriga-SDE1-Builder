@@ -71,17 +71,23 @@ router.post('/preview', authenticateToken, async (req, res) => {
   }
 
   try {
+    // Consolidate duplicate medicines if any
+    const consolidatedMap = new Map();
+    for (const item of items) {
+      const mId = parseInt(item.medicine_id);
+      const qty = parseInt(item.quantity);
+      if (!mId || !qty || qty <= 0) {
+        return res.status(400).json({ error: 'Valid medicine and positive quantity required for each item' });
+      }
+      consolidatedMap.set(mId, (consolidatedMap.get(mId) || 0) + qty);
+    }
+
     const previewResults = [];
     let grandTotal = 0;
     let hasShortage = false;
 
-    for (const item of items) {
-      const qty = parseInt(item.quantity);
-      if (!qty || qty <= 0) {
-        return res.status(400).json({ error: 'Quantity must be a positive number' });
-      }
-
-      const plan = await calculateFEFOAllocation(item.medicine_id, qty);
+    for (const [mId, qty] of consolidatedMap.entries()) {
+      const plan = await calculateFEFOAllocation(mId, qty);
       if (!plan.isFulfilled) {
         hasShortage = true;
       }
@@ -106,18 +112,28 @@ router.post('/preview', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   const { patient_name, items } = req.body;
 
-  if (!patient_name || !items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Patient name and items array are required' });
+  if (!patient_name || !patient_name.trim() || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Patient name and at least one medicine item are required' });
   }
 
   try {
+    // Consolidate duplicate medicines if any
+    const consolidatedMap = new Map();
+    for (const item of items) {
+      const mId = parseInt(item.medicine_id);
+      const qty = parseInt(item.quantity);
+      if (!mId || !qty || qty <= 0) {
+        return res.status(400).json({ error: 'Valid medicine and positive quantity required for each item' });
+      }
+      consolidatedMap.set(mId, (consolidatedMap.get(mId) || 0) + qty);
+    }
+
     // 1. Verify availability for all items using FEFO engine
     const plans = [];
     let grandTotal = 0;
 
-    for (const item of items) {
-      const qty = parseInt(item.quantity);
-      const plan = await calculateFEFOAllocation(item.medicine_id, qty);
+    for (const [mId, qty] of consolidatedMap.entries()) {
+      const plan = await calculateFEFOAllocation(mId, qty);
 
       if (!plan.isFulfilled) {
         return res.status(400).json({
@@ -132,14 +148,30 @@ router.post('/', authenticateToken, async (req, res) => {
     // 2. Generate unique reference invoice number
     const refNo = `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Resolve valid user ID in database
+    let activeUserId = req.user && (req.user.id || req.user._id);
+    let activeUserName = req.user && req.user.name;
+    const userInDb = await queryOne('SELECT id, name FROM users WHERE id = ?', [activeUserId]);
+    if (!userInDb) {
+      const fallbackUser = await queryOne('SELECT id, name FROM users ORDER BY id ASC LIMIT 1');
+      if (fallbackUser) {
+        activeUserId = fallbackUser.id;
+        activeUserName = fallbackUser.name;
+      } else {
+        return res.status(401).json({ error: 'No user account found. Please register your account at /register first.' });
+      }
+    } else {
+      activeUserName = userInDb.name || activeUserName || 'Pharmacist';
+    }
+
     // 3. Create Dispense Record
     const recordResult = await execute(
       `INSERT INTO dispense_records (reference_no, patient_name, user_id, total_amount)
        VALUES (?, ?, ?, ?)`,
-      [refNo, patient_name.trim(), req.user.id, grandTotal]
+      [refNo, patient_name.trim(), activeUserId, grandTotal]
     );
 
-    const dispenseId = recordResult.lastID;
+    const dispenseId = recordResult.insertId || recordResult.lastID;
     const itemRecords = [];
 
     // 4. Atomic Deductions and Dispense Items creation
@@ -159,7 +191,7 @@ router.post('/', authenticateToken, async (req, res) => {
         );
 
         itemRecords.push({
-          id: itemResult.lastID,
+          id: itemResult.insertId || itemResult.lastID,
           medicine_name: plan.medicine.name,
           batch_number: alloc.batch_number,
           expiry_date: alloc.expiry_date,
@@ -176,7 +208,7 @@ router.post('/', authenticateToken, async (req, res) => {
         dispenseId,
         reference_no: refNo,
         patient_name: patient_name.trim(),
-        dispensed_by: req.user.name,
+        dispensed_by: activeUserName || 'Pharmacist',
         dispensed_at: new Date().toISOString(),
         total_amount: grandTotal,
         items: itemRecords
@@ -184,7 +216,7 @@ router.post('/', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('Dispense execution error:', err);
-    res.status(500).json({ error: 'Failed to process dispense transaction' });
+    res.status(500).json({ error: err.message || 'Failed to process dispense transaction' });
   }
 });
 

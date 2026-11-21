@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FEFO Point of Sale Dispenser — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .cart-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .cart-table th {
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .cart-table td {
+      padding: 0.65rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: middle;
+    }
+    .qty-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+    .qty-btn:hover {
+      background: var(--primary);
+      color: #041017;
+    }
+    .remove-btn {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .remove-btn:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+    .med-preview-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem;
+      margin-bottom: 0.85rem;
+    }
+    .med-preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">FEFO Point of Sale (POS) Dispenser</h1>
+        <p class="page-subtitle">Multi-medicine prescription dispenser with algorithmic earliest-expiry FEFO batch deduction</p>
+      </div>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="badge badge-success" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+          🛡️ STRICT FEFO ENFORCED
+        </span>
+        <span class="badge badge-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+          💊 MULTI-MEDICINE POS
+        </span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2" style="align-items: start; margin-bottom: 2rem;">
+      <!-- Dispense Order Form & Prescription Cart -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #fff;">
+            1. Prescription &amp; Patient Entry
+          </h2>
+          <span class="badge badge-primary" id="cart-count-badge">0 Medicines</span>
+        </div>
+
+        <!-- Patient Name Input -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label">Patient Full Name <span style="color: var(--danger);">*</span></label>
+          <input type="text" id="patient-name" class="form-control" placeholder="e.g. Ramesh Kumar" required value="Ramesh Kumar">
+        </div>
+
+        <!-- Add Medicine to Prescription Subcard -->
+        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.25rem;">
+          <div style="font-size: 0.825rem; font-weight: 700; text-transform: uppercase; color: var(--primary); letter-spacing: 0.05em; margin-bottom: 0.75rem;">
+            ➕ Add Medicine to Prescription
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label class="form-label" style="font-size: 0.8rem;">Select Medicine</label>
+            <select id="medicine-select" class="form-control" onchange="onMedicineChange()">
+              <option value="">-- Choose Medicine --</option>
+            </select>
+            <div id="selected-med-info" style="font-size: 0.8rem; margin-top: 0.35rem;"></div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+              <label class="form-label" style="font-size: 0.8rem;">Quantity</label>
+              <input type="number" id="dispense-qty" class="form-control" placeholder="Qty" min="1" value="10">
+            </div>
+            <button type="button" onclick="addToPrescription()" class="btn btn-primary" style="white-space: nowrap; height: 42px;">
+              ➕ Add Medicine
+            </button>
+          </div>
+        </div>
+
+        <!-- Prescription Cart Table -->
+        <div style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Prescription Items in Order</label>
+            <button type="button" onclick="clearPrescription()" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; display: none;" id="clear-cart-btn">
+              🗑️ Clear All
+            </button>
+          </div>
+
+          <div id="prescription-list-container">
+            <div style="text-align: center; color: var(--text-dim); padding: 2rem 1rem; border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm);">
+              No medicines added yet.<br>
+              <span style="font-size: 0.8rem;">Select a medicine above and click <strong>"➕ Add Medicine"</strong> to add it to this patient's prescription.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" id="simulate-btn" onclick="handleSimulateFEFO()" class="btn btn-secondary" style="flex: 1;" disabled>
+            ⚡ Preview FEFO Allocation
+          </button>
+          <button type="button" id="confirm-btn" onclick="executeDispense()" class="btn btn-success" style="flex: 1;" disabled>
+            ✅ Confirm &amp; Dispense
+          </button>
+        </div>
+      </div>
+
+      <!-- Live FEFO Allocation Simulation View -->
+      <div class="card" id="preview-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #fff;">
+            2. FEFO Batch Allocation Simulation
+          </h2>
+          <span id="preview-status-badge"></span>
+        </div>
+
+        <div id="preview-content">
+          <div style="text-align: center; color: var(--text-dim); padding: 3.5rem 1rem;">
+            Add medicines to the prescription order on the left, then click <strong>"Preview FEFO Allocation"</strong> to calculate exact lot draws.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dispense History Audit Log -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 700; color: #fff;">
+          Recent FEFO Dispensing Audit Log
+        </h2>
+        <button onclick="loadHistory()" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">
+          🔄 Refresh Log
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference No</th>
+              <th>Patient</th>
+              <th>Medicines Dispensed</th>
+              <th>Dispensed By</th>
+              <th>Total Amount</th>
+              <th>Date &amp; Time</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">Loading audit history...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt Modal -->
+  <div class="modal-overlay" id="receipt-modal">
+    <div class="modal" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🧾 Official Dispense Invoice Receipt</h3>
+        <button class="modal-close" onclick="closeReceipt()">&times;</button>
+      </div>
+      <div id="receipt-body"></div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+        <button onclick="window.print()" class="btn btn-secondary" style="flex: 1;">🖨️ Print Receipt</button>
+        <button onclick="closeReceipt()" class="btn btn-primary" style="flex: 1;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    PharmaExpiry &copy; 2026. Built with Node.js, Express &amp; MySQL.
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let medicinesList = [];
+    let prescriptionCart = []; // Array of { medicine_id, name, category, unit, quantity, sellable_stock }
+    let lastDispensedReceipt = null;
+
+    if (requireAuth()) {
+      renderNavbar('dispense');
+      initPOS();
+    }
+
+    async function initPOS() {
+      await loadMedicines();
+      await loadHistory();
+    }
+
+    async function loadMedicines() {
+      const { ok, data } = await apiFetch('/medicines?limit=100');
+      if (ok && data && data.data) {
+        medicinesList = data.data;
+        const select = document.getElementById('medicine-select');
+        select.innerHTML = '<option value="">-- Choose Medicine --</option>' + 
+          medicinesList.map(m => `
+            <option value="${m.id}" data-stock="${m.sellable_stock || 0}">
+              ${m.name} (${m.category}) — Stock: ${m.sellable_stock || 0} ${m.unit}
+            </option>
+          `).join('');
+
+        if (medicinesList.length > 0) {
+          select.value = medicinesList[0].id;
+          onMedicineChange();
+        }
+      }
+    }
+
+    function onMedicineChange() {
+      const select = document.getElementById('medicine-select');
+      const opt = select.selectedOptions[0];
+      const info = document.getElementById('selected-med-info');
+
+      if (opt && opt.value) {
+        const stock = parseInt(opt.dataset.stock) || 0;
+        info.innerHTML = stock > 0 
+          ? `<span style="color: var(--success);">✓ In-Date Sellable Stock: <strong>${stock} units</strong></span>`
+          : `<span style="color: var(--danger);">✗ No sellable in-date stock available for this medicine!</span>`;
+      } else {
+        info.innerHTML = '';
+      }
+    }
+
+    function addToPrescription() {
+      const select = document.getElementById('medicine-select');
+      const medId = parseInt(select.value);
+      const qtyInput = document.getElementById('dispense-qty');
+      const qty = parseInt(qtyInput.value);
+
+      if (!medId) {
+        showToast('Please select a medicine first', 'warning');
+        return;
+      }
+
+      if (!qty || qty <= 0) {
+        showToast('Please enter a valid positive quantity', 'warning');
+        return;
+      }
+
+      const medicine = medicinesList.find(m => m.id === medId);
+      if (!medicine) return;
+
+      const stock = parseInt(medicine.sellable_stock) || 0;
+      if (stock <= 0) {
+        showToast(`No sellable in-date stock for ${medicine.name}`, 'danger');
+        return;
+      }
+
+      // Check if already in prescription
+      const existing = prescriptionCart.find(item => item.medicine_id === medId);
+      if (existing) {
+        const newQty = existing.quantity + qty;
+        if (newQty > stock) {
+          showToast(`Total quantity (${newQty}) exceeds in-date stock (${stock}) for ${medicine.name}`, 'warning');
+        }
+        existing.quantity = newQty;
+        showToast(`Updated ${medicine.name} quantity to ${newQty}`, 'info');
+      } else {
+        if (qty > stock) {
+          showToast(`Warning: Requested (${qty}) exceeds in-date stock (${stock}) for ${medicine.name}`, 'warning');
+        }
+        prescriptionCart.push({
+          medicine_id: medId,
+          name: medicine.name,
+          category: medicine.category,
+          unit: medicine.unit,
+          quantity: qty,
+          sellable_stock: stock
+        });
+        showToast(`Added ${medicine.name} to prescription`, 'success');
+      }
+
+      // Reset quantity input to 10
+      qtyInput.value = 10;
+      invalidatePreview();
+      renderPrescriptionCart();
+    }
+
+    function updateCartItemQty(medId, delta) {
+      const item = prescriptionCart.find(i => i.medicine_id === medId);
+      if (!item) return;
+
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) {
+        removeFromCart(medId);
+        return;
+      }
+
+      item.quantity = newQty;
+      invalidatePreview();
+      renderPrescriptionCart();
+    }
+
+    function setCartItemQty(medId, val) {
+      const item = prescriptionCart.find(i => i.medicine_id === medId);
+      if (!item) return;
+
+      const parsed = parseInt(val);
+      if (!parsed || parsed <= 0) {
+        removeFromCart(medId);
+        return;
+      }
+
+      item.quantity = parsed;
+      invalidatePreview();
+      renderPrescriptionCart();
+    }
+
+    function removeFromCart(medId) {
+      prescriptionCart = prescriptionCart.filter(i => i.medicine_id !== medId);
+      invalidatePreview();
+      renderPrescriptionCart();
+      showToast('Medicine removed from prescription', 'info');
+    }
+
+    function clearPrescription() {
+      if (prescriptionCart.length === 0) return;
+      if (confirm('Clear all medicines from this prescription?')) {
+        prescriptionCart = [];
+        invalidatePreview();
+        renderPrescriptionCart();
+      }
+    }
+
+    function invalidatePreview() {
+      const confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.disabled = true;
+      document.getElementById('preview-status-badge').innerHTML = '';
+      document.getElementById('preview-content').innerHTML = `
+        <div style="text-align: center; color: var(--text-dim); padding: 3rem 1rem;">
+          Prescription updated. Click <strong>"Preview FEFO Allocation"</strong> to calculate batch draws.
+        </div>
+      `;
+    }
+
+    function renderPrescriptionCart() {
+      const container = document.getElementById('prescription-list-container');
+      const badge = document.getElementById('cart-count-badge');
+      const clearBtn = document.getElementById('clear-cart-btn');
+      const simulateBtn = document.getElementById('simulate-btn');
+
+      badge.innerText = `${prescriptionCart.length} Medicine${prescriptionCart.length === 1 ? '' : 's'}`;
+
+      if (prescriptionCart.length === 0) {
+        clearBtn.style.display = 'none';
+        simulateBtn.disabled = true;
+        container.innerHTML = `
+          <div style="text-align: center; color: var(--text-dim); padding: 2rem 1rem; border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm);">
+            No medicines added yet.<br>
+            <span style="font-size: 0.8rem;">Select a medicine above and click <strong>"➕ Add Medicine"</strong> to add it to this patient's prescription.</span>
+          </div>
+        `;
+        return;
+      }
+
+      clearBtn.style.display = 'inline-block';
+      simulateBtn.disabled = false;
+
+      let rowsHtml = prescriptionCart.map((item, idx) => `
+        <tr>
+          <td><strong style="color: #fff;">${idx + 1}. ${item.name}</strong><br><span style="color: var(--text-dim); font-size: 0.75rem;">${item.category}</span></td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <button type="button" class="qty-btn" onclick="updateCartItemQty(${item.medicine_id}, -1)">-</button>
+              <input type="number" value="${item.quantity}" min="1" onchange="setCartItemQty(${item.medicine_id}, this.value)" style="width: 50px; text-align: center; background: rgba(7,11,20,0.8); border: 1px solid var(--border-subtle); color: #fff; border-radius: 4px; padding: 2px 4px; font-weight: 700;">
+              <button type="button" class="qty-btn" onclick="updateCartItemQty(${item.medicine_id}, 1)">+</button>
+              <span style="color: var(--text-dim); font-size: 0.75rem; margin-left: 2px;">${item.unit}</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${item.quantity <= item.sellable_stock ? 'badge-success' : 'badge-danger'}" style="font-size: 0.75rem;">
+              ${item.sellable_stock} available
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button type="button" class="remove-btn" onclick="removeFromCart(${item.medicine_id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="table-container" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+          <table class="cart-table">
+            <thead>
+              <tr>
+                <th>Medicine</th>
+                <th>Quantity</th>
+                <th>Stock</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    async function handleSimulateFEFO() {
+      const patientName = document.getElementById('patient-name').value.trim();
+      const previewContent = document.getElementById('preview-content');
+      const statusBadge = document.getElementById('preview-status-badge');
+      const confirmBtn = document.getElementById('confirm-btn');
+
+      if (!patientName) {
+        showToast('Please enter the patient name', 'warning');
+        return;
+      }
+
+      if (prescriptionCart.length === 0) {
+        showToast('Please add at least one medicine to the prescription', 'warning');
+        return;
+      }
+
+      previewContent.innerHTML = '<div style="color: var(--text-muted); padding: 3rem; text-align: center;">⚡ Simulating FEFO sequence across active lots for all medicines...</div>';
+
+      const payloadItems = prescriptionCart.map(item => ({
+        medicine_id: item.medicine_id,
+        quantity: item.quantity
+      }));
+
+      const { ok, data } = await apiFetch('/dispense/preview', {
+        method: 'POST',
+        body: JSON.stringify({ items: payloadItems })
+      });
+
+      if (!ok || !data) {
+        previewContent.innerHTML = `<div class="badge badge-danger">Simulation failed: ${data.error || 'Check stock availability'}</div>`;
+        confirmBtn.disabled = true;
+        return;
+      }
+
+      if (data.hasShortage) {
+        confirmBtn.disabled = true;
+        statusBadge.innerHTML = '<span class="badge badge-danger">⚠️ STOCK SHORTAGE DETECTED</span>';
+        
+        const shortageCards = data.previewResults.map(p => {
+          if (!p.isFulfilled) {
+            return `
+              <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 0.75rem;">
+                <strong style="color: #fca5a5;">⚠️ ${p.medicine.name} Shortage:</strong>
+                <p style="color: #cbd5e1; font-size: 0.85rem; margin-top: 0.25rem;">
+                  Requested: <strong>${p.requestedQty}</strong> | In-Date Available: <strong>${p.allocatedQty}</strong> (Shortage of ${p.unfulfilledQty} ${p.medicine.unit})
+                </p>
+              </div>
+            `;
+          }
+          return '';
+        }).join('');
+
+        previewContent.innerHTML = `
+          ${shortageCards}
+          <p style="font-size: 0.8rem; color: var(--text-muted);">Please adjust the quantities in the prescription on the left to match available sellable stock.</p>
+        `;
+        return;
+      }
+
+      // Success: All medicines fulfilled!
+      confirmBtn.disabled = false;
+      statusBadge.innerHTML = '<span class="badge badge-success">✓ ALL MEDICINES 100% FEFO FULFILLABLE</span>';
+
+      let medSectionsHtml = data.previewResults.map(plan => {
+        let rows = plan.allocations.map(alloc => `
+          <tr>
+            <td><strong style="color: var(--primary); font-family: monospace;">${alloc.batch_number}</strong></td>
+            <td><span class="badge badge-warning">${alloc.expiry_date}</span></td>
+            <td>${alloc.shelf_location || 'Rack'}</td>
+            <td><strong>${alloc.quantity_allocated}</strong> units</td>
+            <td>${formatCurrency(alloc.unit_price)}</td>
+            <td><strong>${formatCurrency(alloc.subtotal)}</strong></td>
+          </tr>
+        `).join('');
+
+        return `
+          <div class="med-preview-card">
+            <div class="med-preview-header">
+              <div>
+                <strong style="color: #fff; font-size: 0.95rem;">💊 ${plan.medicine.name}</strong>
+                <span style="font-size: 0.75rem; color: var(--text-dim); margin-left: 0.5rem;">(${plan.medicine.category})</span>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Req: <strong>${plan.requestedQty} ${plan.medicine.unit}</strong> | Subtotal: </span>
+                <strong style="color: var(--success);">${formatCurrency(plan.totalPrice)}</strong>
+              </div>
+            </div>
+
+            <div class="table-container" style="margin: 0;">
+              <table style="font-size: 0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Batch #</th>
+                    <th>Expiry Date</th>
+                    <th>Shelf</th>
+                    <th>Draw Units</th>
+                    <th>Price</th>
+                    <th>Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      previewContent.innerHTML = `
+        <div style="margin-bottom: 1.25rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.85rem 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Total Prescription Value:</div>
+            <div style="font-size: 1.35rem; font-weight: 800; color: #fff;">${formatCurrency(data.grandTotal)}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Patient: <strong style="color: #fff;">${patientName}</strong></div>
+            <div style="font-size: 0.8rem; color: var(--primary);"><strong>${data.previewResults.length}</strong> Medicine(s) Verified</div>
+          </div>
+        </div>
+
+        <div style="max-height: 380px; overflow-y: auto; padding-right: 4px;">
+          ${medSectionsHtml}
+        </div>
+
+        <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.75rem; line-height: 1.4;">
+          ℹ️ Batches are allocated algorithmically strictly in order of earliest expiry date. Zero expired batches are included.
+        </p>
+      `;
+    }
+
+    async function executeDispense() {
+      const patientName = document.getElementById('patient-name').value.trim();
+      const confirmBtn = document.getElementById('confirm-btn');
+
+      if (!patientName) {
+        showToast('Please enter the patient name', 'warning');
+        return;
+      }
+
+      if (prescriptionCart.length === 0) {
+        showToast('No medicines in prescription to dispense', 'warning');
+        return;
+      }
+
+      confirmBtn.disabled = true;
+      confirmBtn.innerText = 'Deducting Stock...';
+
+      const payloadItems = prescriptionCart.map(item => ({
+        medicine_id: item.medicine_id,
+        quantity: item.quantity
+      }));
+
+      const { ok, data } = await apiFetch('/dispense', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_name: patientName,
+          items: payloadItems
+        })
+      });
+
+      confirmBtn.disabled = false;
+      confirmBtn.innerText = '✅ Confirm & Dispense';
+
+      if (!ok || !data.receipt) {
+        showToast(data.error || 'Failed to process dispense transaction', 'error');
+        return;
+      }
+
+      showToast(`Successfully dispensed ${data.receipt.items.length} item(s) for ${patientName}!`, 'success');
+      lastDispensedReceipt = data.receipt;
+      showReceipt(data.receipt);
+
+      // Reset Prescription Cart
+      prescriptionCart = [];
+      invalidatePreview();
+      renderPrescriptionCart();
+
+      // Refresh stock counts and history
+      await loadMedicines();
+      await loadHistory();
+    }
+
+    function showReceipt(r) {
+      const modal = document.getElementById('receipt-modal');
+      const body = document.getElementById('receipt-body');
+
+      const itemsHtml = r.items.map(i => `
+        <div class="receipt-row" style="font-size: 0.85rem; padding: 0.25rem 0;">
+          <div>
+            <strong>${i.medicine_name}</strong>
+            <div style="font-size: 0.72rem; color: #94a3b8; font-family: monospace;">Lot: ${i.batch_number} | Exp: ${i.expiry_date}</div>
+          </div>
+          <div style="text-align: right;">
+            <span>${i.quantity} × ${formatCurrency(i.unit_price)}</span>
+            <div style="font-weight: 700; color: #fff;">${formatCurrency(i.subtotal)}</div>
+          </div>
+        </div>
+      `).join('');
+
+      body.innerHTML = `
+        <div class="receipt">
+          <div class="receipt-header">
+            <h3 style="margin: 0; color: #fff;">PHARMAEXPIRY CLINICAL PHARMACY</h3>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">FEFO Certified Patient POS Invoice</div>
+          </div>
+
+          <div class="receipt-row">
+            <span>Invoice Ref:</span>
+            <strong style="color: var(--primary); font-family: monospace;">${r.reference_no}</strong>
+          </div>
+          <div class="receipt-row">
+            <span>Patient Name:</span>
+            <strong>${r.patient_name}</strong>
+          </div>
+          <div class="receipt-row">
+            <span>Dispensed By:</span>
+            <span>${r.dispensed_by}</span>
+          </div>
+          <div class="receipt-row">
+            <span>Date &amp; Time:</span>
+            <span>${new Date(r.dispensed_at).toLocaleString()}</span>
+          </div>
+
+          <div style="border-top: 1px dashed rgba(255,255,255,0.2); margin: 0.75rem 0;"></div>
+
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.5rem;">
+            Dispensed Medicines &amp; Batches (${r.items.length} items)
+          </div>
+
+          ${itemsHtml}
+
+          <div class="receipt-total receipt-row" style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 2px solid rgba(255,255,255,0.25);">
+            <span>TOTAL AMOUNT PAID:</span>
+            <span>${formatCurrency(r.total_amount)}</span>
+          </div>
+        </div>
+      `;
+
+      modal.classList.add('active');
+    }
+
+    function closeReceipt() {
+      document.getElementById('receipt-modal').classList.remove('active');
+    }
+
+    async function loadHistory() {
+      const { ok, data } = await apiFetch('/dispense/history?limit=10');
+      const tbody = document.getElementById('history-tbody');
+      if (ok && data && data.data) {
+        if (data.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">No dispense history recorded yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.data.map(item => {
+          let medsSummary = '';
+          if (item.items && item.items.length > 0) {
+            medsSummary = item.items.map(i => 
+              `<span class="badge badge-info" style="margin: 2px 4px 2px 0; font-size: 0.72rem;">${i.medicine_name} (${i.quantity})</span>`
+            ).join('');
+          } else {
+            medsSummary = '<span style="color: var(--text-dim); font-size: 0.75rem;">1 Item</span>';
+          }
+
+          return `
+            <tr>
+              <td><strong style="color: var(--primary); font-family: monospace;">${item.reference_no}</strong></td>
+              <td><strong>${item.patient_name}</strong></td>
+              <td style="max-width: 280px;">${medsSummary}</td>
+              <td>${item.dispensed_by}</td>
+              <td><strong style="color: var(--success);">${formatCurrency(item.total_amount)}</strong></td>
+              <td style="font-size: 0.8rem; color: var(--text-muted);">${new Date(item.dispensed_at).toLocaleString()}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  </script>
+</body>
+</html>

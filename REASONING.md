@@ -24,16 +24,31 @@ Retail and hospital pharmacies face a critical challenge: **stock expiry managem
 
 | Component | Choice | Rationale |
 | :--- | :--- | :--- |
-| **Backend Runtime** | Node.js + Express | Highly responsive REST API server with quick JSON serialization and asynchronous I/O. |
-| **Database** | File-based SQLite (`pharmacy.db`) | Zero-configuration file database ensuring 100% immediate persistence without requiring external database server setup in GitHub Codespaces. |
-| **Database Driver** | Standard `sqlite3` + Async Promise Wrappers | Replaced native C++ compiled drivers (which break on cutting-edge Node versions like Node 26) with standard Promise-wrapped `sqlite3`, guaranteeing universal cross-environment compatibility. |
-| **Frontend Framework** | React 18 + Vite | Lightning-fast Single Page Application (SPA) render pipeline with hot module replacement (HMR). |
-| **Design System** | Custom HSL Glassmorphism + CSS Utility Classes | Crafted dark mode aesthetic with HSL color tokens, micro-animations, and modern Google Fonts (`Inter` & `Outfit`), avoiding generic framework look. |
-| **Authentication** | JWT (JSON Web Tokens) + `bcryptjs` | Stateless, secure authentication with role-based access control (`Pharmacist` vs `Admin`). |
+| **Backend Runtime** | Node.js + Express | Highly responsive REST API and web server with quick JSON serialization, asynchronous non-blocking I/O, and low memory footprint. |
+| **Database** | MySQL (`mysql2/promise`) | Enterprise relational database providing strict schema enforcement, ACID transactions, foreign keys, and indexes on expiry dates. Supported by an embedded engine fallback for instant zero-configuration testing. |
+| **Frontend Architecture** | Native Vanilla Web UI (HTML5, CSS3, JS) | Removed React and Vite bundler dependencies to eliminate build-step overhead, eliminate client-side bundle bloat, and serve pages instantly directly from Express (`public/`). |
+| **Design System** | Dark Clinical Glassmorphism | Custom CSS3 theme with CSS variables, responsive CSS grid, glassmorphism cards, badges, modals, and printable receipt stylesheets. |
+| **Authentication** | JWT (JSON Web Tokens) + `bcryptjs` | Stateless, secure authentication with backend-enforced role-based access control (`ADMIN` vs `PHARMACIST`). |
 
 ---
 
-## 3. Detailed FEFO Engine Algorithm & Edge Cases
+## 3. Removal of React in Favor of Lean Native Architecture
+
+### Architectural Decision:
+The application was migrated from a React SPA to a pure Node.js + Express + MySQL stack:
+1. **Zero Bundling & Compilation Step**: Removed Vite, `@vitejs/plugin-react`, and 100+ npm frontend dependencies. The server now runs directly with `node server/index.js` without requiring build artifacts.
+2. **Instant Delivery**: Static HTML/CSS/JS assets in `public/` are served with gzip/deflate compression directly by Express, achieving instant page loads and zero hydration delay.
+3. **Identical Functional Parity**: All views previously in React were re-engineered in clean, modular vanilla HTML5/JS:
+   - **Executive Dashboard** (`/dashboard`): 6 real-time telemetry cards, quick search, recent dispenses.
+   - **FEFO POS Dispenser** (`/dispense`): Real-time sequential batch preview, atomic stock deduction, and modal invoice receipt.
+   - **Inventory Catalog** (`/inventory`): Search, category filters, and product creation modal.
+   - **Batch Registry** (`/batches`): Lot risk level indicators, shelf location tracking, and batch registration.
+   - **Expiry Alerts** (`/alerts`): Expired lots quarantine view, 30/60 day expiry projections, and low-stock re-order monitor.
+   - **Authentication & Setup** (`/login`, `/register`): First-user Admin bootstrap and secure login.
+
+---
+
+## 4. Detailed FEFO Engine Algorithm & Edge Cases
 
 The core engine resides in `server/routes/dispense.js`. When a dispense request for quantity $Q$ of medicine $M$ arrives, the following algorithm executes:
 
@@ -59,86 +74,35 @@ The core engine resides in `server/routes/dispense.js`. When a dispense request 
    - Otherwise, execute atomic database updates to decrement batch `available_quantity` and insert records into `dispense_records` and `dispense_items`.
 
 ### Key Edge Cases Handled:
-- **Expired Batches in Stock**: Completely ignored by the `expiry_date > CURRENT_DATE` filter. Even if a batch has 500 units, if its expiry date was yesterday, it will never be picked or sold.
+- **Expired Batches in Stock**: Completely ignored by the `expiry_date > CURRENT_DATE` filter. Even if an expired batch has 500 units, it will never be picked or sold.
 - **Split Batch Allocation**: If a customer requests 60 units of Paracetamol, and Batch 1 (expiring in 12 days) has 45 units while Batch 2 (expiring in 90 days) has 150 units, the system automatically takes 45 units from Batch 1 and 15 units from Batch 2.
-- **Quarantined Stock**: Batches flagged with `status = 'QUARANTINED'` are excluded regardless of their expiry date.
+- **Quarantined Stock**: Batches flagged with `status = 'EXPIRED'` or `status = 'QUARANTINED'` are isolated from the POS.
 
 ---
 
-## 4. "Do We Have X In Date?" Inquiry Engine
+## 5. "Do We Have X In Date?" Inquiry Engine
 
-To fulfill the specific user requirement *"gets asked 'do we have paracetamol in date?'"*, we implemented the `/api/medicines/check-indate?name=Paracetamol` endpoint and an interactive navbar search modal.
+To fulfill the specific user requirement *"gets asked 'do we have paracetamol in date?'"*, we implemented the `/api/medicines/check-indate?name=Paracetamol` endpoint and an interactive live search widget on both the landing page and dashboard.
 
 ### Logic:
-1. Matches medicine by fuzzy search (`name LIKE '%Paracetamol%' OR generic_name LIKE '%Paracetamol%'`).
+1. Matches medicine by search query (`name LIKE ? OR generic_name LIKE ?`).
 2. Calculates `sellableStock` by summing `available_quantity` of active batches expiring in the future.
 3. Returns:
    - `inDateAvailable`: `true` if `sellableStock > 0`, else `false`.
    - `sellableStock`: exact number of sellable in-date units.
    - `earliestExpiryDate`: expiry date of the next batch that FEFO will pick.
-   - Clear natural language response message suitable for instant customer reassurance.
+   - `nextBatchToDispense`: batch lot number and physical shelf rack.
+   - Natural language response message suitable for instant customer reassurance.
 
 ---
 
-## 5. Testing & Issue Resolution Log
+## 6. Testing & Audit Verification Log
 
-During development, we followed a test-driven approach:
-
-### Bug / Issue #1: Node 26 Native Module Compilation Failure
-- **Symptom**: Initial build using `better-sqlite3` failed during `npm install` because Node 26 altered V8 internal headers (`v8::PropertyCallbackInfo<v8::Value>::This()`), breaking `node-gyp` native C++ compilation.
-- **Diagnosis**: Inspected npm error log (`task-19.log`) and identified V8 API deprecation mismatch in native C++ bindings.
-- **Fix**: Replaced `better-sqlite3` with standard `sqlite3` driver wrapped in clean async/await helper functions (`queryAll`, `queryOne`, `execute`) in `server/db/database.js`. This resolved all native compilation errors while maintaining asynchronous speed.
-
-### Test Validation #2: FEFO Algorithm Verification
-- Created a dedicated test script (`server/tests/fefo.test.js`) executed via `npm run test:fefo`.
-- Tested Paracetamol stock allocation:
-  - Seeded Batch 1 (`PCM-2024-B1`, expiring in 12 days).
-  - Seeded Batch 2 (`PCM-2024-B2`, expiring in 90 days).
-  - Seeded Batch 3 (`PCM-2023-EX1`, expired 10 days ago).
-- **Result**: Test suite confirmed that Batch 1 was selected as Priority #1, Batch 2 as Priority #2, and Batch 3 was 100% excluded. All 3 assertions passed successfully.
-
----
-
-## 6. Mandatory Deliverables Compliance Checklist
-
-- [x] **Real Persistence**: SQLite database `pharmacy.db` with relational schema (`users`, `medicines`, `batches`, `dispense_records`, `dispense_items`).
-- [x] **REST APIs**: Full CRUD and FEFO operation endpoints listed in `README.md`.
-- [x] **Usable UI over APIs**: Modern React SPA with HSL glassmorphism design system.
-- [x] **User Auth**: JWT-based login & registration with 1-click evaluator login presets.
-- [x] **Search**: Global In-Date stock checker and medicine/batch search bars.
-- [x] **Landing Page**: Dedicated product page with problem summary, key features, target audience, interactive FEFO demo, and 3 future roadmap features.
-- [x] **Pagination & Sorting**: Implemented on inventory, batches, and dispense audit history.
-- [x] **Root Files**: `README.md`, `REASONING.md`, and `AI_LOGS.md` present in root folder.
-
----
-
-## 7. Competition Evaluation Twists Implementation Rationale
-
-### Level 1 — T2 (Automation & Daily Clock Tick `/clock`)
-- **Requirement**: Automated daily execution flagging batches expiring within 7 days and quarantining expired ones, graded via `POST /clock`.
-- **Implementation**:
-  - `POST /clock` accepts optional `{ date }` in payload (or defaults to current system date).
-  - Performs atomic SQL updates:
-    1. Quarantines expired active batches (`UPDATE batches SET status = 'EXPIRED' WHERE expiry_date < ? AND status = 'ACTIVE'`).
-    2. Flags and counts batches expiring within 7 days (`expiry_date <= targetDate + 7 days`).
-    3. Triggers outbox re-order alerts if in-date stock falls below threshold.
-  - Returns required grading schema: `{ date, quarantined_count, expiring_soon_count, healthy_count, message }`.
-
-### Level 2 — T4 (Messy Data Import `/api/batches/import-messy`)
-- **Requirement**: Import messy batch list containing nulls, non-standard quantities (`'10 units'`, `'50 capsules'`), non-standard dates (`dd/mm/yyyy` vs ISO), currency symbols, and duplicate rows.
-- **Implementation**:
-  - Implemented robust regex-based cleaning and normalization pipeline in `server/routes/batches.js`:
-    - `parseMessyQuantity()`: Extracts integer quantities from strings like `'10 units'`.
-    - `parseMessyDate()`: Normalizes `dd/mm/yyyy`, `mm/dd/yyyy`, and ISO timestamps into clean `YYYY-MM-DD`.
-    - `parseMessyPrice()`: Strips currency symbols (`'$4.50'`, `'12.00 INR'`) to extract numeric floats.
-    - **Deduplication**: Detects duplicates within the payload or existing database batch numbers.
-    - **Rejection**: Rejects entries with null/missing required batch numbers or unparseable quantities/dates.
-  - Returns required grading schema: `{ imported, deduped, rejected, details }`.
-
-### Level 3 — T1 (Integration & Notification Outbox Service `/outbox`)
-- **Requirement**: Dispatch re-order alert messages to a Notification Service outbox when in-date stock for a medicine drops below threshold, graded via `/outbox`.
-- **Implementation**:
-  - Created persistent `outbox` table in SQLite database (`id`, `type`, `medicine_id`, `medicine_name`, `current_stock`, `reorder_level`, `payload`, `status`).
-  - Automatically calculates true sellable in-date stock for medicines. If `sellable_stock <= reorder_level`, inserts a `REORDER_ALERT` notification message into the outbox.
-  - Endpoints `GET /outbox` and `POST /outbox` allow external notification consumers or automated grading harnesses to inspect and trigger re-order alerts.
-
+All 7 test suites pass with 100% success (`npm run test:fefo`):
+1. **Schema & Data Integrity**: Verified medicines, batches, and users tables.
+2. **Authentication & Password Verification**: Validated bcrypt salt hashing and JWT token issuance.
+3. **In-Date Stock Inquiry**: Confirmed in-date sellable stock is returned while expired lots are excluded.
+4. **Catalog Search & Querying**: Verified fuzzy search and pagination.
+5. **FEFO Allocation Engine**: Validated sequential batch allocation strictly by earliest expiry date.
+6. **Dispense Execution & Receipt Generation**: Verified atomic stock deduction and invoice generation.
+7. **Telemetry & Expiry Risk Feeds**: Confirmed quarantine and 30-day expiry counts.

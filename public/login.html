@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h2 style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem;">Sign In to PharmaExpiry</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">Access POS Dispenser &amp; Inventory Management</p>
+      </div>
+
+      <div id="error-alert" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); padding: 0.75rem 1rem; color: #fca5a5; font-size: 0.85rem; margin-bottom: 1.25rem;"></div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="email" class="form-control" placeholder="user@pharma.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+          Sign In to System
+        </button>
+      </form>
+
+      <div style="margin-top: 1.5rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+        New pharmacy setup? <a href="/register" style="color: var(--primary); font-weight: 600;">Register as First Admin</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    renderNavbar('login');
+
+    // Auto-redirect if already logged in
+    if (getAuthToken() && getUser()) {
+      window.location.href = '/dashboard';
+    }
+
+    function fillCreds(email, password) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = password;
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const errorAlert = document.getElementById('error-alert');
+      const submitBtn = document.getElementById('submit-btn');
+
+      errorAlert.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Authenticating...';
+
+      const { ok, data } = await apiFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Sign In to System';
+
+      if (!ok || !data.token) {
+        errorAlert.style.display = 'block';
+        errorAlert.innerText = data.error || 'Failed to authenticate. Please check your credentials.';
+        return;
+      }
+
+      setSession(data.token, data.user);
+      showToast('Logged in successfully!', 'success');
+      window.location.href = '/dashboard';
+    }
+  </script>
+</body>
+</html>

@@ -174,9 +174,21 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/medicines
+// POST /api/medicines (Creates medicine and optional initial stock batch with dates)
 router.post('/', authenticateToken, async (req, res) => {
-  const { name, generic_name, category, unit, reorder_level } = req.body;
+  const {
+    name,
+    generic_name,
+    category,
+    unit,
+    reorder_level,
+    batch_number,
+    initial_quantity,
+    mfg_date,
+    expiry_date,
+    unit_price,
+    shelf_location
+  } = req.body;
 
   if (!name || !category) {
     return res.status(400).json({ error: 'Name and category are required' });
@@ -195,8 +207,37 @@ router.post('/', authenticateToken, async (req, res) => {
       ]
     );
 
-    const newMed = await queryOne('SELECT * FROM medicines WHERE id = ?', [result.lastID]);
-    res.status(201).json(newMed);
+    const medicineId = result.insertId || result.lastID;
+
+    // If batch details with expiry date are provided, insert initial batch lot
+    let batchCreated = null;
+    if (expiry_date) {
+      const today = new Date().toISOString().split('T')[0];
+      const batchNo = (batch_number && batch_number.trim()) || `LOT-${Date.now().toString().slice(-6)}`;
+      const qty = parseInt(initial_quantity) || 50;
+      const mfg = mfg_date || today;
+      const exp = expiry_date;
+      const price = parseFloat(unit_price) || 10.0;
+      const shelf = (shelf_location && shelf_location.trim()) || 'Rack A-1';
+      const status = exp <= today ? 'EXPIRED' : 'ACTIVE';
+
+      await execute(
+        `INSERT INTO batches (medicine_id, batch_number, initial_quantity, available_quantity, mfg_date, expiry_date, unit_price, shelf_location, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [medicineId, batchNo, qty, qty, mfg, exp, price, shelf, status]
+      );
+
+      batchCreated = {
+        batch_number: batchNo,
+        available_quantity: qty,
+        expiry_date: exp,
+        shelf_location: shelf,
+        status
+      };
+    }
+
+    const newMed = await queryOne('SELECT * FROM medicines WHERE id = ?', [medicineId]);
+    res.status(201).json({ ...newMed, batch: batchCreated });
   } catch (err) {
     console.error('Error creating medicine:', err);
     res.status(500).json({ error: 'Failed to create medicine' });

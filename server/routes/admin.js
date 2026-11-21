@@ -1,6 +1,5 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import User from '../models/User.js';
 import { queryAll, queryOne, execute } from '../db/database.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { generateAndSendOtp } from '../services/otpService.js';
@@ -16,8 +15,6 @@ router.use(authenticate, requireAdmin);
  * Rules:
  * - Backend strictly sets role = "PHARMACIST".
  * - Frontend cannot control assigned role.
- * - Initial isVerified = false.
- * - Generates email OTP for verification/activation.
  */
 router.post('/pharmacists', async (req, res) => {
   const { name, email, password, phone } = req.body || {};
@@ -30,18 +27,9 @@ router.post('/pharmacists', async (req, res) => {
     const cleanEmail = email.toString().toLowerCase().trim();
     const cleanPhone = phone ? phone.toString().trim() : null;
 
-    // Check if user already exists in MongoDB
-    let existingUser = null;
-    try {
-      existingUser = await User.findOne({ email: cleanEmail });
-    } catch (_) {}
-
-    if (!existingUser) {
-      const existingSqlite = await queryOne('SELECT id FROM users WHERE LOWER(email) = ?', [cleanEmail]);
-      if (existingSqlite) {
-        return res.status(400).json({ error: 'A user account with this email address already exists' });
-      }
-    } else {
+    // Check if user already exists
+    const existing = await queryOne('SELECT id FROM users WHERE LOWER(email) = ?', [cleanEmail]);
+    if (existing) {
       return res.status(400).json({ error: 'A user account with this email address already exists' });
     }
 
@@ -51,30 +39,13 @@ router.post('/pharmacists', async (req, res) => {
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(userPassword, salt);
 
-    let pharmacistUser = null;
-
-    // Save in MongoDB Mongoose
-    try {
-      pharmacistUser = await User.create({
-        name: name.toString().trim(),
-        email: cleanEmail,
-        passwordHash,
-        role: assignedRole,
-        phone: cleanPhone,
-        isActive: true,
-        isVerified: true, // Directly verified by Admin
-      });
-    } catch (dbErr) {
-      console.warn('MongoDB User save fallback to SQLite:', dbErr.message);
-    }
-
-    // Save in SQLite for dual storage compatibility
-    const sqliteRes = await execute(
-      `INSERT INTO users (name, email, password, phone, role) VALUES (?, ?, ?, ?, ?)`,
+    const insertRes = await execute(
+      `INSERT INTO users (name, email, password, phone, role, is_active, is_verified)
+       VALUES (?, ?, ?, ?, ?, 1, 1)`,
       [name.toString().trim(), cleanEmail, passwordHash, cleanPhone, assignedRole]
     );
 
-    const userId = pharmacistUser ? pharmacistUser._id : sqliteRes.lastID;
+    const userId = insertRes.insertId || insertRes.lastID;
 
     res.status(201).json({
       message: `Pharmacist account for ${name} created successfully.`,
@@ -83,6 +54,7 @@ router.post('/pharmacists', async (req, res) => {
         name: name.toString().trim(),
         email: cleanEmail,
         role: assignedRole,
+        phone: cleanPhone,
         isActive: true,
         isVerified: true,
       },
@@ -102,54 +74,39 @@ router.get('/pharmacists', async (req, res) => {
     const search = req.query.search || '';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    let pharmacists = [];
-    let totalItems = 0;
+    const params = [];
+    let whereClauses = ["role = 'PHARMACIST'"];
 
-    try {
-      const filter = {
-        role: { $in: ['PHARMACIST', 'Pharmacist'] },
-        ...(search
-          ? {
-              $or: [
-                { name: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-              ],
-            }
-          : {}),
-      };
-
-      totalItems = await User.countDocuments(filter);
-      pharmacists = await User.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit);
-    } catch (_) {}
-
-    if (pharmacists.length === 0) {
-      const sqliteWhere = search ? `WHERE (role = 'PHARMACIST' OR role = 'Pharmacist') AND (name LIKE ? OR email LIKE ?)` : `WHERE (role = 'PHARMACIST' OR role = 'Pharmacist')`;
-      const sqliteParams = search ? [`%${search}%`, `%${search}%`] : [];
-
-      const countRes = await queryOne(`SELECT COUNT(*) as count FROM users ${sqliteWhere}`, sqliteParams);
-      totalItems = countRes ? countRes.count : 0;
-
-      const rows = await queryAll(
-        `SELECT id, name, email, role, phone, created_at FROM users ${sqliteWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-        [...sqliteParams, limit, skip]
-      );
-
-      pharmacists = rows.map((r) => ({
-        _id: r.id,
-        id: r.id,
-        name: r.name,
-        email: r.email,
-        role: 'PHARMACIST',
-        isActive: true,
-        isVerified: true,
-        createdAt: r.created_at,
-      }));
+    if (search) {
+      whereClauses.push('(name LIKE ? OR email LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
     }
+
+    const whereString = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const countRes = await queryOne(`SELECT COUNT(*) as count FROM users ${whereString}`, params);
+    const totalItems = countRes ? countRes.count : 0;
+
+    const rows = await queryAll(
+      `SELECT id, name, email, phone, role, is_active, is_verified, created_at 
+       FROM users ${whereString} 
+       ORDER BY created_at DESC 
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    const pharmacists = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      role: 'PHARMACIST',
+      isActive: r.is_active === 1 || r.is_active === true || r.is_active === '1',
+      isVerified: r.is_verified === 1 || r.is_verified === true || r.is_verified === '1',
+      createdAt: r.created_at,
+    }));
 
     res.json({
       pharmacists,
@@ -173,33 +130,27 @@ router.get('/pharmacists', async (req, res) => {
 router.get('/pharmacists/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    let pharmacist = null;
+    const user = await queryOne(
+      'SELECT id, name, email, phone, role, is_active, is_verified, created_at FROM users WHERE id = ?',
+      [id]
+    );
 
-    try {
-      pharmacist = await User.findById(id);
-    } catch (_) {}
-
-    if (!pharmacist) {
-      const sqliteUser = await queryOne('SELECT id, name, email, role, created_at FROM users WHERE id = ?', [id]);
-      if (sqliteUser) {
-        pharmacist = {
-          _id: sqliteUser.id,
-          id: sqliteUser.id,
-          name: sqliteUser.name,
-          email: sqliteUser.email,
-          role: sqliteUser.role,
-          isActive: true,
-          isVerified: true,
-          createdAt: sqliteUser.created_at,
-        };
-      }
-    }
-
-    if (!pharmacist) {
+    if (!user) {
       return res.status(404).json({ error: 'Pharmacist not found' });
     }
 
-    res.json({ pharmacist });
+    res.json({
+      pharmacist: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isActive: user.is_active === 1 || user.is_active === true,
+        isVerified: user.is_verified === 1 || user.is_verified === true,
+        createdAt: user.created_at,
+      },
+    });
   } catch (err) {
     console.error('Error fetching pharmacist details:', err);
     res.status(500).json({ error: 'Failed to fetch pharmacist details' });
@@ -215,28 +166,26 @@ router.patch('/pharmacists/:id', async (req, res) => {
     const { id } = req.params;
     const { name, email, phone } = req.body;
 
-    let updatedUser = null;
-
-    try {
-      updatedUser = await User.findByIdAndUpdate(
-        id,
-        {
-          ...(name ? { name: name.trim() } : {}),
-          ...(email ? { email: email.toLowerCase().trim() } : {}),
-          ...(phone ? { phone: phone.trim() } : {}),
-        },
-        { new: true }
-      );
-    } catch (_) {}
-
-    if (name || email) {
-      await execute(
-        `UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email) WHERE id = ?`,
-        [name ? name.trim() : null, email ? email.toLowerCase().trim() : null, id]
-      );
+    const existing = await queryOne('SELECT id FROM users WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Pharmacist not found' });
     }
 
-    res.json({ message: 'Pharmacist details updated successfully', pharmacist: updatedUser || { id, name, email } });
+    await execute(
+      `UPDATE users SET 
+        name = COALESCE(?, name), 
+        email = COALESCE(?, email),
+        phone = COALESCE(?, phone)
+       WHERE id = ?`,
+      [name ? name.trim() : null, email ? email.toLowerCase().trim() : null, phone ? phone.trim() : null, id]
+    );
+
+    const updated = await queryOne('SELECT id, name, email, phone, role, is_active FROM users WHERE id = ?', [id]);
+
+    res.json({
+      message: 'Pharmacist details updated successfully',
+      pharmacist: updated,
+    });
   } catch (err) {
     console.error('Error updating pharmacist:', err);
     res.status(500).json({ error: 'Failed to update pharmacist details' });
@@ -245,7 +194,7 @@ router.patch('/pharmacists/:id', async (req, res) => {
 
 /**
  * PATCH /api/admin/pharmacists/:id/status
- * Toggle pharmacist active/deactive status
+ * Toggle pharmacist active/inactive status
  */
 router.patch('/pharmacists/:id/status', async (req, res) => {
   try {
@@ -256,19 +205,40 @@ router.patch('/pharmacists/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'isActive boolean property is required' });
     }
 
-    let updatedUser = null;
-
-    try {
-      updatedUser = await User.findByIdAndUpdate(id, { isActive }, { new: true });
-    } catch (_) {}
+    await execute('UPDATE users SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, id]);
 
     res.json({
       message: `Pharmacist account ${isActive ? 'activated' : 'deactivated'} successfully`,
-      pharmacist: updatedUser || { id, isActive },
+      pharmacist: { id, isActive },
     });
   } catch (err) {
     console.error('Error updating pharmacist status:', err);
     res.status(500).json({ error: 'Failed to update pharmacist status' });
+  }
+});
+
+/**
+ * DELETE /api/admin/pharmacists/:id
+ */
+router.delete('/pharmacists/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await queryOne('SELECT id, role FROM users WHERE id = ?', [id]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.role === 'ADMIN') {
+      return res.status(403).json({ error: 'Cannot delete ADMIN user' });
+    }
+
+    await execute('DELETE FROM users WHERE id = ?', [id]);
+
+    res.json({ message: 'Pharmacist account deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting pharmacist:', err);
+    res.status(500).json({ error: 'Failed to delete pharmacist account' });
   }
 });
 

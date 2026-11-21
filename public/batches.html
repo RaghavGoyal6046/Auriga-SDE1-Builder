@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Registry &amp; FEFO Sequence — PharmaExpiry</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Batch Registry &amp; FEFO Sequence</h1>
+        <p class="page-subtitle">Granular pharmaceutical lot tracking ordered strictly by earliest expiry date</p>
+      </div>
+      <div>
+        <button onclick="openAddBatchModal()" class="btn btn-primary">+ Register New Batch</button>
+      </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+          <input 
+            type="text" 
+            id="batch-search" 
+            class="form-control" 
+            placeholder="Search by batch lot # or medicine name..."
+            oninput="loadBatches()"
+          />
+        </div>
+        <div style="width: 200px;">
+          <select id="status-filter" class="form-control" onchange="loadBatches()">
+            <option value="ALL">All Batches</option>
+            <option value="ACTIVE">Active (In-Date)</option>
+            <option value="EXPIRING_SOON">Expiring Soon (30 Days)</option>
+            <option value="EXPIRED">Expired (Quarantine)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Batches Table -->
+    <div class="card">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Batch Number</th>
+              <th>Medicine</th>
+              <th>Expiry Date (FEFO)</th>
+              <th>Available / Initial</th>
+              <th>Unit Price</th>
+              <th>Shelf Rack</th>
+              <th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody id="batches-tbody">
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">Loading batch registry...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Batch Modal -->
+  <div class="modal-overlay" id="add-batch-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Register New Pharmaceutical Batch</h3>
+        <button class="modal-close" onclick="closeAddBatchModal()">&times;</button>
+      </div>
+
+      <form id="add-batch-form" onsubmit="handleAddBatch(event)">
+        <div class="form-group">
+          <label class="form-label">Select Medicine</label>
+          <select id="batch-med-id" class="form-control" required>
+            <option value="">-- Choose Medicine --</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2">
+          <div class="form-group">
+            <label class="form-label">Batch Code / Lot #</label>
+            <input type="text" id="batch-number" class="form-control" placeholder="e.g. PCM-2026-B1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Quantity Received</label>
+            <input type="number" id="batch-qty" class="form-control" placeholder="100" min="1" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2">
+          <div class="form-group">
+            <label class="form-label">Manufacturing Date</label>
+            <input type="date" id="batch-mfg" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Expiry Date</label>
+            <input type="date" id="batch-expiry" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2">
+          <div class="form-group">
+            <label class="form-label">Unit Price (₹)</label>
+            <input type="number" id="batch-price" class="form-control" placeholder="5.50" step="0.01" min="0.01" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Physical Shelf Rack</label>
+            <input type="text" id="batch-shelf" class="form-control" placeholder="Rack A-1" required>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" onclick="closeAddBatchModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Register Batch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    PharmaExpiry &copy; 2026. Built with Node.js, Express &amp; MySQL.
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    if (requireAuth()) {
+      renderNavbar('batches');
+      initBatchesPage();
+    }
+
+    async function initBatchesPage() {
+      await loadBatches();
+      await loadMedicineDropdown();
+    }
+
+    async function loadMedicineDropdown() {
+      const { ok, data } = await apiFetch('/medicines?limit=100');
+      if (ok && data && data.data) {
+        const select = document.getElementById('batch-med-id');
+        select.innerHTML = '<option value="">-- Choose Medicine --</option>' +
+          data.data.map(m => `<option value="${m.id}">${m.name} (${m.category})</option>`).join('');
+      }
+    }
+
+    async function loadBatches() {
+      const search = document.getElementById('batch-search').value.trim();
+      const status = document.getElementById('status-filter').value;
+
+      let queryParams = new URLSearchParams();
+      if (search) queryParams.set('search', search);
+      if (status) queryParams.set('status', status);
+      queryParams.set('limit', '50');
+
+      const { ok, data } = await apiFetch(`/batches?${queryParams.toString()}`);
+      const tbody = document.getElementById('batches-tbody');
+
+      if (!ok || !data || !data.data) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--danger); padding: 2rem;">Failed to fetch batch records.</td></tr>';
+        return;
+      }
+
+      if (data.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No batches found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.data.map(b => {
+        let badge = '<span class="badge badge-success">HEALTHY</span>';
+        if (b.risk_level === 'EXPIRED' || b.status === 'EXPIRED') {
+          badge = '<span class="badge badge-danger">EXPIRED</span>';
+        } else if (b.risk_level === 'EXPIRING_SOON') {
+          badge = '<span class="badge badge-warning">EXPIRING SOON</span>';
+        }
+
+        return `
+          <tr>
+            <td><strong style="color: var(--primary); font-family: monospace;">${b.batch_number}</strong></td>
+            <td><strong>${b.medicine_name}</strong></td>
+            <td><strong style="color: #38bdf8;">${b.expiry_date}</strong></td>
+            <td><strong>${b.available_quantity}</strong> / ${b.initial_quantity} ${b.unit || ''}</td>
+            <td>${formatCurrency(b.unit_price)}</td>
+            <td>${b.shelf_location}</td>
+            <td>${badge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openAddBatchModal() {
+      document.getElementById('add-batch-modal').classList.add('active');
+    }
+
+    function closeAddBatchModal() {
+      document.getElementById('add-batch-modal').classList.remove('active');
+    }
+
+    async function handleAddBatch(e) {
+      e.preventDefault();
+      const medicine_id = parseInt(document.getElementById('batch-med-id').value);
+      const batch_number = document.getElementById('batch-number').value.trim();
+      const initial_quantity = parseInt(document.getElementById('batch-qty').value);
+      const mfg_date = document.getElementById('batch-mfg').value;
+      const expiry_date = document.getElementById('batch-expiry').value;
+      const unit_price = parseFloat(document.getElementById('batch-price').value);
+      const shelf_location = document.getElementById('batch-shelf').value.trim();
+
+      const { ok, data } = await apiFetch('/batches', {
+        method: 'POST',
+        body: JSON.stringify({
+          medicine_id,
+          batch_number,
+          initial_quantity,
+          mfg_date,
+          expiry_date,
+          unit_price,
+          shelf_location
+        })
+      });
+
+      if (!ok) {
+        showToast(data.error || 'Failed to save batch', 'error');
+        return;
+      }
+
+      showToast(`Batch "${batch_number}" registered successfully!`, 'success');
+      closeAddBatchModal();
+      document.getElementById('add-batch-form').reset();
+      loadBatches();
+    }
+  </script>
+</body>
+</html>
