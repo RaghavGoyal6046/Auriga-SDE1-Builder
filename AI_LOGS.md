@@ -321,6 +321,26 @@
 >    - All 7 end-to-end FEFO audit tests pass with 100% success (`npm run test:fefo`).
 
 ---
+
+### Turn 26: Admin Staff Management Console & Pharmacist Onboarding UI
+> **User Prompt**:  
+> - "Interviewer n pucha why you make first user as admin"
+> - "isme staff kaha s add karein admin option to show nahi ho rah ah"
+
+> **AI Assistant Response**:  
+> 1. **Architectural Rationale for First-User Bootstrap**: Detailed the security rationale (Zero-State Provisioning, avoiding hardcoded default credentials, OWASP compliance, and permanent post-bootstrap registration lockout).
+> 2. **Dedicated Staff Management Console (`public/staff.html`)**:
+>    - Built a dedicated Admin console at `/staff` (and `/admin`) restricted exclusively to users with `ADMIN` role.
+>    - Included metrics cards for Total Staff, Active Staff, and Deactivated Staff.
+>    - Created "+ Add New Pharmacist" modal form (`POST /api/admin/pharmacists`) enabling immediate onboarding with name, email, phone, and password (default `pharmacy123`).
+>    - Added live search, status toggling (`PATCH /api/admin/pharmacists/:id/status`), and account deletion (`DELETE /api/admin/pharmacists/:id`).
+> 3. **Navigation & Dashboard Integration**:
+>    - Updated `public/js/app.js` (`renderNavbar`) to dynamically display `👥 Staff (Admin)` in the navbar only when logged in as an Admin.
+>    - Added a quick "👥 Manage Staff" link in the header of `public/dashboard.html` for Admin users.
+>    - Configured server routes in `server/index.js` for `/staff` and `/admin`.
+>    - Verified all 7 end-to-end FEFO audit tests pass with 100% success (`npm run test:fefo`).
+
+---
 *End of Conversation Log.*
 
 

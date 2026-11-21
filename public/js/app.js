@@ -100,6 +100,7 @@ function renderNavbar(activePage = '') {
 
   const user = getUser();
   const isLoggedIn = !!user && !!getAuthToken();
+  const isAdmin = user && (user.role === 'ADMIN');
 
   navContainer.innerHTML = `
     <nav class="navbar">
@@ -115,12 +116,13 @@ function renderNavbar(activePage = '') {
           <li><a href="/inventory" class="nav-link ${activePage === 'inventory' ? 'active' : ''}">Inventory</a></li>
           <li><a href="/batches" class="nav-link ${activePage === 'batches' ? 'active' : ''}">Batches</a></li>
           <li><a href="/alerts" class="nav-link ${activePage === 'alerts' ? 'active' : ''}">Expiry Alerts</a></li>
+          ${isAdmin ? `<li><a href="/staff" class="nav-link ${activePage === 'staff' ? 'active' : ''}" style="color: #38bdf8; font-weight: 700;">👥 Staff (Admin)</a></li>` : ''}
         </ul>
 
         <div class="nav-user">
           <div class="user-badge">
             <span>👤 ${user.name || 'User'}</span>
-            <span class="role-pill">${(user.role || 'PHARMACIST').toUpperCase()}</span>
+            <span class="role-pill ${isAdmin ? 'role-admin' : ''}">${(user.role || 'PHARMACIST').toUpperCase()}</span>
           </div>
           <button onclick="clearSession()" class="btn btn-secondary btn-sm">Logout</button>
         </div>

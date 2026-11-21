@@ -15,7 +15,10 @@
         <h1 class="page-title">Executive Operations Dashboard</h1>
         <p class="page-subtitle">Real-time inventory metrics, FEFO telemetry, and sales auditing</p>
       </div>
-      <div>
+      <div style="display: flex; gap: 0.75rem; align-items: center;" id="dash-action-buttons">
+        <a href="/staff" class="btn btn-secondary" id="admin-staff-btn" style="display: none; border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8;">
+          👥 Manage Staff
+        </a>
         <a href="/dispense" class="btn btn-primary">⚡ Open FEFO POS Dispenser</a>
       </div>
     </div>
@@ -121,6 +124,11 @@
   <script>
     if (requireAuth()) {
       renderNavbar('dashboard');
+      const user = getUser();
+      if (user && user.role === 'ADMIN') {
+        const staffBtn = document.getElementById('admin-staff-btn');
+        if (staffBtn) staffBtn.style.display = 'inline-flex';
+      }
       loadDashboardStats();
     }
 

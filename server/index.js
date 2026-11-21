@@ -69,6 +69,8 @@ app.get('/inventory', (req, res) => res.sendFile(path.join(publicPath, 'inventor
 app.get('/batches', (req, res) => res.sendFile(path.join(publicPath, 'batches.html')));
 app.get('/dispense', (req, res) => res.sendFile(path.join(publicPath, 'dispense.html')));
 app.get('/alerts', (req, res) => res.sendFile(path.join(publicPath, 'alerts.html')));
+app.get('/staff', (req, res) => res.sendFile(path.join(publicPath, 'staff.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(publicPath, 'staff.html')));
 
 // 404 Handler for undefined API routes
 app.use('/api/*', (req, res) => {
