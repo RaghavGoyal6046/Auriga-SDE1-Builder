@@ -29,7 +29,7 @@ The system is built purely with **Node.js, Express.js, and MySQL** — with zero
 ### 1. Installation & Environment Configuration
 ```bash
 git clone <repository-url>
-cd Auriga
+cd PharmaTrace
 npm install
 cp .env.example .env
 ```
